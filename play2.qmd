@@ -1173,25 +1173,21 @@ ggplot(uad, aes(x=N_IPD, y=N_SSUAD, label=st)) +
 
 Vaccination of children across the US, by state and vaccine
 
-```{r}
-fig <- plot_ly(
-  data = vax_age, 
-  x = ~Vaccine, 
-  y = ~Geography, 
-  z = ~vax_uptake, 
-  type = "heatmap",
-  colorscale = "Viridis",
-  reversescale = TRUE  # Reverse the color scale like `direction=-1` in ggplot
-) 
+```{r, fig.width=5, fig.height=7}
+plot_vax <- vax_age %>% mutate(vax_order=as.numeric(as.factor(Vaccine)), Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
+ggplot(aes(x = vax_uptake, y = Vaccine_dose, 
+           text=paste0(Geography, "<br>", 
+                       Vaccine_dose, "<br>",
+                       'Age: ',age, "<br>", 
+                       vax_uptake, "%" ))) +
+  geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.25, width = 0, alpha = 0.7) + 
+  scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
+labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
+  theme_minimal() + 
+  scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, vjust = 0.5))
 
-fig <- fig %>%
-  layout(
-    title = "Vaccine Uptake 35 Months",
-    xaxis = list(title = "Vaccine", tickangle = -45),  # Rotate x-axis labels
-    yaxis = list(title = "State")
-  )
-
-fig  # Display the plot
+ggplotly(plot_vax, tooltip='text')
 ```
 
 ### Uptake by urbanicity
