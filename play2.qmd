@@ -33,6 +33,7 @@ library(usmap)
 library(cowplot)
 library(viridis)
 library(sf)
+library(ggrepel)
 library(readxl)
 library(ggalluvial)
 #library(cdcfluview)
@@ -70,7 +71,6 @@ yale_gradient <- c("#DDDDDD",
 #   as.data.frame() |>
 #   cbind(State = states$name)
 ```
-
 
 ```{r rsv_data}
 #| context: data
@@ -266,7 +266,6 @@ vax_age <- open_dataset('./Data/vax/peds_vax.parquet') %>%
       (Vaccine=='PCV' & Dose =='≥4 Doses') 
                                        ) )
 
-
 vax_urban <- open_dataset('./Data/vax/peds_vax.parquet') %>%
   rename(birth_year = `Birth Year/Birth Cohort`, dim1=`Dimension Type`, urban=Dimension,vax_uptake=`Estimate (%)`, samp_size_vax=`Sample Size`) %>%
   collect() %>%
@@ -359,14 +358,15 @@ opioid_od <- read_csv(opioid_path) %>%
 ```{r}
 
 
-library(leaflet)
+#library(leaflet)
 #https://r-graph-gallery.com/183-choropleth-map-with-leaflet.html
 ```
-
 
 # PopHIVE: Population Health Information and Visualization Exchange
 
 Welcome to PopHIVE: The Population Health Information and Visualization Exchange, hosted by the Yale School of Public Health. The goal of this initiative is to collect and present timely and informative data on population health from diverse sources, including traditional public health surveillance data, electronic health records, sewage testing, internet search trends, population surveys, and modeled outputs.
+
+------------------------------------------------------------------------
 
 ```{r rsv_plots}
 #| context: server
@@ -483,61 +483,44 @@ ggplotly(rsv_ts_comp)
 #vaccine urbanicity
 output$vax_urban_plot <- renderPlotly({
 
-   plot_ds <- vax_urban %>% filter(Vaccine==input$select.vax2)
-        fig <- plot_ly(
-          data = plot_ds, 
-          x = ~urban, 
-          y = ~Geography, 
-          z = ~vax_uptake, 
-          type = "heatmap",
-          colorscale = "Viridis",
-          reversescale = TRUE,  # Reverse the color scale
-          zmin = min(plot_ds$vax_uptake, na.rm = TRUE), 
-          zmax = max(plot_ds$vax_uptake, na.rm = TRUE),
-          showscale = TRUE
-        ) %>%
-          colorbar(title = "Uptake") %>%
-          layout(
-            title = "Vaccine Uptake 35 Months",
-            xaxis = list(title = "Vaccine", tickangle = -45),
-            yaxis = list(title = "State")
-          )
-        
-        # Set NA values to gray
-        fig <- fig %>% layout(plot_bgcolor = "gray")
-        
-        
-        fig  # Display the plot
+  plot_vax <- vax_urban %>% 
+    filter(Vaccine==input$select.vax2) %>% mutate(vax_order=as.numeric(as.factor(Vaccine)), Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
+ggplot(aes(x = vax_uptake, y = urban, 
+           text=paste0(Geography, "<br>", 
+                       Vaccine_dose, "<br>",
+                       vax_uptake, "%" ))) +
+  geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
+  scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
+labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
+  theme_minimal() + 
+  scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, vjust = 0.5))
+
+  ggplotly(plot_vax, tooltip='text') #display the plot
+  
+  
     })
 
-#vaccine urbanicity
+#vaccine, by insurance state
 output$vax_insurance_plot <- renderPlotly({
 
-   plot_ds <- vax_insurance %>% filter(Vaccine==input$select.vax3)
-        fig <- plot_ly(
-          data = plot_ds, 
-          x = ~insurance, 
-          y = ~Geography, 
-          z = ~vax_uptake, 
-          type = "heatmap",
-          colorscale = "Viridis",
-          reversescale = TRUE,  # Reverse the color scale
-          zmin = min(plot_ds$vax_uptake, na.rm = TRUE), 
-          zmax = max(plot_ds$vax_uptake, na.rm = TRUE),
-          showscale = TRUE
-        ) %>%
-          colorbar(title = "Uptake") %>%
-          layout(
-            title = "Vaccine Uptake 35 Months",
-            xaxis = list(title = "Vaccine", tickangle = -45),
-            yaxis = list(title = "State")
-          )
-        
-        # Set NA values to gray
-        fig <- fig %>% layout(plot_bgcolor = "gray")
-        
-        
-        fig  # Display the plot
+   plot_ins <- vax_insurance %>% 
+       filter(Vaccine==input$select.vax2) %>% mutate(vax_order=as.numeric(as.factor(Vaccine)),  
+                                                     Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
+    ggplot(aes(x = vax_uptake, y = insurance, 
+           text=paste0(Geography, "<br>", 
+                       Vaccine_dose, "<br>",
+                       vax_uptake, "%" ))) +
+      geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
+      scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
+    labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
+      theme_minimal() + 
+      scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
+      theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, 
+                                                                                                          vjust = 0.5))
+
+  ggplotly(plot_ins, tooltip='text') #display the plot
+  
     })
 ```
 
@@ -864,7 +847,7 @@ RSV is a leading cause of hospitalizations in infants and also causes a large bu
 ::: panel-tabset
 ### Compare Data
 
-Viral levels in the community can be measured in different ways. This plot shows how relying on data from the emergency department (ED), hospitalizations, and sewage surveillance can yield different estimates of epidemic timing. This could be because of who contributes to the different datasets: different age groups could contribute different aount of information to each line, and the location of the EDs and the location of the sewage sampling  
+Viral levels in the community can be measured in different ways. This plot shows how relying on data from the emergency department (ED), hospitalizations, and sewage surveillance can yield different estimates of epidemic timing. This could be because of who contributes to the different datasets: different age groups could contribute different aount of information to each line, and the location of the EDs and the location of the sewage sampling
 
 ```{r}
 #| panel: sidebar
@@ -972,7 +955,7 @@ p2
 
 ### Trends in Google searches
 
-People searching for information on RSV often correlates well with actual clinical activity for RSV. 
+People searching for information on RSV often correlates well with actual clinical activity for RSV.
 
 ```{r}
 #| panel: fill
@@ -1134,7 +1117,7 @@ plotlyOutput("stGeographyPlot")
 
 ### Comparison of invasive pneumococcal disease and pneumonia
 
-Most often, pneumococcal disease is diagnosed by isolating the bacteria from blood or cerebrospinal fluid. It is harder to determine what serotypes cause pneumonia. This study from Louisville, Kentucky found that the serotypes that are the most common causes of severe blood stream infections are also the most common causes of pneumonia.  pneumonia [Ramirez et al OFID 2025](https://academic.oup.com/ofid/article/12/1/ofae727/7926903)
+Most often, pneumococcal disease is diagnosed by isolating the bacteria from blood or cerebrospinal fluid. It is harder to determine what serotypes cause pneumonia. This study from Louisville, Kentucky found that the serotypes that are the most common causes of severe blood stream infections are also the most common causes of pneumonia. pneumonia [Ramirez et al OFID 2025](https://academic.oup.com/ofid/article/12/1/ofae727/7926903)
 
 ```{r}
 ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
@@ -1167,31 +1150,26 @@ ggplot(uad, aes(x=N_IPD, y=N_SSUAD, label=st)) +
 
 ## Vaccination
 
+Vaccination of children across the US, by state and vaccine. These data come from the [National Immunization Survey](https://data.cdc.gov/Child-Vaccinations/Vaccination-Coverage-among-Young-Children-0-35-Mon/fhky-rtsk/about_data) The size of the circle is proportional to the number of children participating in the survey. Caution should be used when interpreting these survey data.
 
 ::: panel-tabset
 ### Uptake by state
 
-Vaccination of children across the US, by state and vaccine
+```{r, fig.width=5, fig.height=7}
+plot_vax <- vax_age %>% mutate(vax_order=as.numeric(as.factor(Vaccine)), Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
+ggplot(aes(x = vax_uptake, y = Vaccine_dose, 
+           text=paste0(Geography, "<br>", 
+                       Vaccine_dose, "<br>",
+                       'Age: ',age, "<br>", 
+                       vax_uptake, "%" ))) +
+  geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.25, width = 0, alpha = 0.7) + 
+  scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
+labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
+  theme_minimal() + 
+  scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, vjust = 0.5))
 
-```{r}
-fig <- plot_ly(
-  data = vax_age, 
-  x = ~Vaccine, 
-  y = ~Geography, 
-  z = ~vax_uptake, 
-  type = "heatmap",
-  colorscale = "Viridis",
-  reversescale = TRUE  # Reverse the color scale like `direction=-1` in ggplot
-) 
-
-fig <- fig %>%
-  layout(
-    title = "Vaccine Uptake 35 Months",
-    xaxis = list(title = "Vaccine", tickangle = -45),  # Rotate x-axis labels
-    yaxis = list(title = "State")
-  )
-
-fig  # Display the plot
+ggplotly(plot_vax, tooltip='text')
 ```
 
 ### Uptake by urbanicity
