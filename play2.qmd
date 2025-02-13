@@ -547,7 +547,7 @@ waffle_2022 <- subset %>%
 ```
 
 ## Welcome to PopHIVE 
-The Population Health Information and Visualization Exchange, hosted by the Yale School of Public Health. The goal of this initiative is to collect and present timely and informative data on population health from diverse sources, including traditional public health surveillance data, electronic health records, sewage testing, internet search trends, population surveys, and modeled outputs. We are just getting started and will be adding many more datasets and disease endpoints in the coming months.
+The goal of this platform is to collect and present timely and informative data on population health from a variety of sources, including traditional public health surveillance data, electronic health records, sewage testing, internet search trends, population surveys, and modeled outputs. We are just getting started and will be adding many more datasets and disease endpoints in the coming months. This project is hosted by the Yale School of Public Health. 
 
 ------------------------------------------------------------------------
 
