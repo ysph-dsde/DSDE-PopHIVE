@@ -1347,19 +1347,6 @@ plotlyOutput("wonder_map")
 
 ```{r}
 #| panel: fill
-plotlyOutput("opioid_bar_graph_2020")
-
-```
-
-```{r}
-#| panel: fill
-plotlyOutput("opioid_bar_graph_2022")
-```
-
-### Datasets
-
-```{r}
-#| panel: fill
 plotOutput("waffle_plot")
 ```
 
