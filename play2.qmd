@@ -925,12 +925,14 @@ output$opioid_bar_graph_2022 <- renderPlotly({
 
 ```
 
-## Respiratory syncytial virus (RSV) in the United States
-
-RSV, a virus that infects the lungs, is an important cause of hospitalizations in infants and older adults. RSV rates tend to start increasing each year in the southeastern US in early autumn, with waves occurring later to the north and west over several months.
+## Respiratory viruses
 
 ::: panel-tabset
-### Composite trends
+
+### RSV
+
+::: panel-tabset
+#### Composite trends
 
 ```{r}
 #| panel: toolbar
@@ -948,7 +950,7 @@ plotlyOutput("distPlotRSV_dwh")
 
 Viral levels in the community can be measured in different ways. This plot shows how relying on data from the emergency department (ED), hospitalizations, and sewage surveillance can yield different estimates of epidemic timing. This could be because of who contributes to the different datasets: different age groups could contribute different aount of information to each line, and the location of the EDs and the location of the sewage sampling
 
-### Trends in positive tests
+#### Trends in positive tests
 
 ```{r}
 #| panel: toolbar
@@ -965,7 +967,7 @@ plotlyOutput("distPlotRSV3")
 
 These data come from the NREVSS surveillance system, which is comprised of laboratories around the US
 
-### Age patterns in hospitalization
+#### Age patterns in hospitalization
 
 ```{r}
 #| panel: toolbar
@@ -983,7 +985,7 @@ plotlyOutput("distPlotRSV_hosp_age")
 
 The hospitalization data comes from the RSV-NET, a CDC-supported network of sites around the US that tracks hospitalizations from RSV, influenza, and COVID-19.
 
-### Current national map (ED)
+#### Current national map (ED)
 
 ```{r}
 #| panel: fill
@@ -1010,7 +1012,7 @@ print(p1)
 
 The maps shows the proportion of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
 
-### Regional trends (NREVSS)
+#### Regional trends (NREVSS)
 
 ```{r}
 heat1 <- rsv1_tests %>%
@@ -1040,7 +1042,7 @@ p2
 
 This dataset has viral test results from a network of laboratories around the US (NREVSS). The location of the labs doesn't necesarilycover the whole population in a state or region. The CDC only publishes these data at the region level
 
-### Trends in Google searches
+#### Trends in Google searches
 
 ```{r}
 #| panel: fill
@@ -1051,6 +1053,16 @@ print('Coming soon!')
 People searching for information on RSV often correlates well with actual clinical activity for RSV.
 :::
 
+RSV, a virus that infects the lungs, is an important cause of hospitalizations in infants and older adults. RSV rates tend to start increasing each year in the southeastern US in early autumn, with waves occurring later to the north and west over several months.
+
+
+### Influenza
+Coming soon!
+
+### SARS-CoV-2
+Coming soon!
+
+:::
 ------------------------------------------------------------------------
 
 ## Pneumococcal disease in the United States
