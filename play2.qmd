@@ -1,5 +1,5 @@
 ---
-title: "PopHIVE"
+title: "PopHIVE: Population Health Information and Visualization Exchange"
 title-block-banner: "#0c233f"
 format:
   html:
@@ -362,9 +362,7 @@ opioid_od <- read_csv(opioid_path) %>%
 #https://r-graph-gallery.com/183-choropleth-map-with-leaflet.html
 ```
 
-# PopHIVE: Population Health Information and Visualization Exchange
-
-Welcome to PopHIVE: The Population Health Information and Visualization Exchange, hosted by the Yale School of Public Health. The goal of this initiative is to collect and present timely and informative data on population health from diverse sources, including traditional public health surveillance data, electronic health records, sewage testing, internet search trends, population surveys, and modeled outputs.
+Welcome to PopHIVE: The Population Health Information and Visualization Exchange, hosted by the Yale School of Public Health. The goal of this initiative is to collect and present timely and informative data on population health from diverse sources, including traditional public health surveillance data, electronic health records, sewage testing, internet search trends, population surveys, and modeled outputs. We are just getting started and will be adding many more datasets and disease endpoints in the coming months
 
 ------------------------------------------------------------------------
 
