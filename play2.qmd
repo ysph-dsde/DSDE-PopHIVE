@@ -411,6 +411,132 @@ waffle_2021 <- subset %>%
 
 waffle_2022 <- subset %>%
   filter(Year %in% 2022)
+
+ # Generate the waffle plots.
+  w1 <- waffle_2020 %>%
+    ggplot(aes(fill = Drug, values = Percentage)) +
+    geom_waffle(n_rows = 5, size = 0.33, colour = "white") +
+    facet_wrap(~Dataset+Year) +
+    # Add the color scheme specific for the drugs present in the SUDORS subset.
+    scale_fill_manual(name = NULL, 
+                      labels = coloring[coloring$Drug %in% unique(waffle_2020$Drug), "Drug"],
+                      values = coloring[coloring$Drug %in% unique(waffle_2020$Drug), "Color"]) +
+    coord_equal() + theme_void(base_size = 16) + 
+    theme(legend.position = "none")
+  
+  
+  w2 <- waffle_2021 %>%
+    ggplot(aes(fill = Drug, values = Percentage)) +
+    geom_waffle(n_rows = 5, size = 0.33, colour = "white") +
+    facet_wrap(~Dataset+Year) +
+    # Add the color scheme specific for the drugs present in the CDC WONDER subset.
+    scale_fill_manual(name = NULL, 
+                      labels = coloring[coloring$Drug %in% unique(waffle_2021$Drug), "Drug"],
+                      values = coloring[coloring$Drug %in% unique(waffle_2021$Drug), "Color"]) +
+    coord_equal() + theme_void(base_size = 16) + 
+    theme(legend.position = "none")
+  
+  
+  w3 <- waffle_2022 %>%
+    ggplot(aes(fill = Drug, values = Percentage)) +
+    geom_waffle(n_rows = 5, size = 0.33, colour = "white") +
+    facet_wrap(~Dataset+Year) +
+    # Add the color scheme specific for the drugs present in the CDC WONDER subset.
+    scale_fill_manual(name = NULL, 
+                      labels = coloring[coloring$Drug %in% unique(waffle_2022$Drug), "Drug"],
+                      values = coloring[coloring$Drug %in% unique(waffle_2022$Drug), "Color"]) +
+    coord_equal() + theme_void(base_size = 16) + 
+    theme(legend.position = "bottom", legend.title = element_blank())
+  
+  
+    # -----------------------------
+  # US Map plot.
+  
+  # Code to find mathes between AHRQ and CDC WONDER
+  #opioid_od[opioid_od$Dataset %in% "AHRQ", "Setting"] %>% unique()
+  
+  # Generate a side-by-side set of plots showing "Drug = All Opioids" counts
+  # by state in 2022. Toggle the setting to show either inpatient or ER.
+  
+  
+  # Counts in AHRQ dataset.
+  ahrq_map_plot <- opioid_od %>%
+    # Filter the placeholder numerical values.
+    filter(Count %!in% 7777 & Count %!in% 8888 & Count %!in% 9999) %>%
+    
+    # Switch between the two settings, and change the subtitle name.
+    filter(Setting %in% "Medical Facility - Inpatient") %>%
+    #filter(Setting %in% "Medical Facility - Outpatient or ER") %>%
+    
+    # Filter the metadata settings.
+    filter(Dataset %in% "AHRQ", State %in% datasets::state.name, 
+           Year %in% 2022, Quarter %in% NA,
+           `Underlying Cause of Death` %in% "All", Drug %in% "All Opioids",
+           Characteristic %in% "Not Stratified", Level %in% "N/A") %>%
+    
+    # plot_usmap() requires specific nomenclature for the column with states.
+    rename(state = State) %>%
+    
+    # Plot settings and features.
+    plot_usmap(data = ., values = "Count", color = "#00356B",) + 
+    scale_fill_gradientn(
+      colors = yale_gradient,   # Use Yale branding colors in gradient
+      name = "Count (2022)", 
+      labels = scales::comma    # Format labels with commas
+    ) + 
+    labs(title = "AHRQ") +
+    theme(legend.position = "",
+          plot.title = element_text(size = 14),  # Increase title size
+          axis.ticks = element_blank(),
+          axis.text = element_blank(),
+          legend.text = element_text(size = 12),               # Adjust legend text
+          legend.title = element_text(size = 14))
+  
+  # Add a custom tooltip with comma formatting
+  ahrq_map_plot <- ahrq_map_plot +
+    aes(text = paste0("State: ", state, "<br>",
+                      "Count: ", scales::comma(Count)))
+  
+
+  # Counts in CDC WONDER dataset.
+  wonder_map_plot <- opioid_od %>%
+    # Filter the placeholder numerical values.
+    filter(Count %!in% 7777 & Count %!in% 8888 & Count %!in% 9999) %>%
+    
+    # Switch between the two settings, and change the subtitle name.
+    filter(Setting %in% "Medical Facility - Inpatient") %>%
+    #filter(Setting %in% "Medical Facility - Outpatient or ER") %>%
+    
+    # Filter the metadata settings.
+    filter(Dataset %in% "CDC WONDER", State %in% datasets::state.name, 
+           Year %in% 2022, Quarter %in% NA,
+           `Underlying Cause of Death` %in% "All", Drug %in% "All Opioids",
+           Characteristic %in% "Not Stratified", Level %in% "N/A") %>%
+    
+    # plot_usmap() requires specific nomenclature for the column with states.
+    rename(state = State) %>%
+    
+    # Plot settings and features.
+    plot_usmap(data = ., values = "Count", color = "#00356B",) + 
+    scale_fill_gradientn(
+      colors = yale_gradient,   # Use Yale branding colors in gradient
+      name = "Count (2022)", 
+      labels = scales::comma    # Format labels with commas
+    ) + 
+    labs(title = "\ \ \ \ \ \ CDC WONDER") +
+    theme(legend.position = "right",
+          plot.title = element_text(size = 14),  # Increase title size
+          axis.ticks = element_blank(),
+          axis.text = element_blank(),
+          legend.text = element_text(size = 14),               # Adjust legend text
+          legend.title = element_text(size = 16))
+  
+  # Add a custom tooltip with comma formatting
+  wonder_map_plot <- wonder_map_plot +
+    aes(text = paste0("State: ", state, "<br>",
+                      "Count: ", scales::comma(Count)))
+  
+  
 ```
 
 ```{r}
@@ -794,149 +920,6 @@ output$opioid_bar_graph_2022 <- renderPlotly({
   
 })
 
-
-
-output$ahrq_map <- renderPlotly({
-  
-  
-  # -----------------------------
-  # US Map plot.
-  
-  # Code to find mathes between AHRQ and CDC WONDER
-  #opioid_od[opioid_od$Dataset %in% "AHRQ", "Setting"] %>% unique()
-  
-  # Generate a side-by-side set of plots showing "Drug = All Opioids" counts
-  # by state in 2022. Toggle the setting to show either inpatient or ER.
-  
-  
-  # Counts in AHRQ dataset.
-  ahrq_map_plot <- opioid_od %>%
-    # Filter the placeholder numerical values.
-    filter(Count %!in% 7777 & Count %!in% 8888 & Count %!in% 9999) %>%
-    
-    # Switch between the two settings, and change the subtitle name.
-    filter(Setting %in% "Medical Facility - Inpatient") %>%
-    #filter(Setting %in% "Medical Facility - Outpatient or ER") %>%
-    
-    # Filter the metadata settings.
-    filter(Dataset %in% "AHRQ", State %in% datasets::state.name, 
-           Year %in% 2022, Quarter %in% NA,
-           `Underlying Cause of Death` %in% "All", Drug %in% "All Opioids",
-           Characteristic %in% "Not Stratified", Level %in% "N/A") %>%
-    
-    # plot_usmap() requires specific nomenclature for the column with states.
-    rename(state = State) %>%
-    
-    # Plot settings and features.
-    plot_usmap(data = ., values = "Count", color = "#00356B",) + 
-    scale_fill_gradientn(
-      colors = yale_gradient,   # Use Yale branding colors in gradient
-      name = "Count (2022)", 
-      labels = scales::comma    # Format labels with commas
-    ) + 
-    labs(title = "AHRQ") +
-    theme(legend.position = "",
-          plot.title = element_text(size = 14),  # Increase title size
-          axis.ticks = element_blank(),
-          axis.text = element_blank(),
-          legend.text = element_text(size = 12),               # Adjust legend text
-          legend.title = element_text(size = 14))
-  
-  # Add a custom tooltip with comma formatting
-  ahrq_map_plot <- ahrq_map_plot +
-    aes(text = paste0("State: ", state, "<br>",
-                      "Count: ", scales::comma(Count)))
-  
-  # Convert to plotly
-  ggplotly(ahrq_map_plot, tooltip = "text")
-})
-
-
-output$wonder_map <- renderPlotly({
-  # Counts in CDC WONDER dataset.
-  wonder_map_plot <- opioid_od %>%
-    # Filter the placeholder numerical values.
-    filter(Count %!in% 7777 & Count %!in% 8888 & Count %!in% 9999) %>%
-    
-    # Switch between the two settings, and change the subtitle name.
-    filter(Setting %in% "Medical Facility - Inpatient") %>%
-    #filter(Setting %in% "Medical Facility - Outpatient or ER") %>%
-    
-    # Filter the metadata settings.
-    filter(Dataset %in% "CDC WONDER", State %in% datasets::state.name, 
-           Year %in% 2022, Quarter %in% NA,
-           `Underlying Cause of Death` %in% "All", Drug %in% "All Opioids",
-           Characteristic %in% "Not Stratified", Level %in% "N/A") %>%
-    
-    # plot_usmap() requires specific nomenclature for the column with states.
-    rename(state = State) %>%
-    
-    # Plot settings and features.
-    plot_usmap(data = ., values = "Count", color = "#00356B",) + 
-    scale_fill_gradientn(
-      colors = yale_gradient,   # Use Yale branding colors in gradient
-      name = "Count (2022)", 
-      labels = scales::comma    # Format labels with commas
-    ) + 
-    labs(title = "\ \ \ \ \ \ CDC WONDER") +
-    theme(legend.position = "right",
-          plot.title = element_text(size = 14),  # Increase title size
-          axis.ticks = element_blank(),
-          axis.text = element_blank(),
-          legend.text = element_text(size = 14),               # Adjust legend text
-          legend.title = element_text(size = 16))
-  
-  # Add a custom tooltip with comma formatting
-  wonder_map_plot <- wonder_map_plot +
-    aes(text = paste0("State: ", state, "<br>",
-                      "Count: ", scales::comma(Count)))
-  
-  ggplotly(wonder_map_plot, tooltip = "text")
-  
-})
-
-output$waffle_plot <- renderPlot({
-  
-  
-  # Generate the waffle plots.
-  w1 <- waffle_2020 %>%
-    ggplot(aes(fill = Drug, values = Percentage)) +
-    geom_waffle(n_rows = 5, size = 0.33, colour = "white") +
-    facet_wrap(~Dataset+Year) +
-    # Add the color scheme specific for the drugs present in the SUDORS subset.
-    scale_fill_manual(name = NULL, 
-                      labels = coloring[coloring$Drug %in% unique(waffle_2020$Drug), "Drug"],
-                      values = coloring[coloring$Drug %in% unique(waffle_2020$Drug), "Color"]) +
-    coord_equal() + theme_void(base_size = 16) + 
-    theme(legend.position = "none")
-  
-  
-  w2 <- waffle_2021 %>%
-    ggplot(aes(fill = Drug, values = Percentage)) +
-    geom_waffle(n_rows = 5, size = 0.33, colour = "white") +
-    facet_wrap(~Dataset+Year) +
-    # Add the color scheme specific for the drugs present in the CDC WONDER subset.
-    scale_fill_manual(name = NULL, 
-                      labels = coloring[coloring$Drug %in% unique(waffle_2021$Drug), "Drug"],
-                      values = coloring[coloring$Drug %in% unique(waffle_2021$Drug), "Color"]) +
-    coord_equal() + theme_void(base_size = 16) + 
-    theme(legend.position = "none")
-  
-  
-  w3 <- waffle_2022 %>%
-    ggplot(aes(fill = Drug, values = Percentage)) +
-    geom_waffle(n_rows = 5, size = 0.33, colour = "white") +
-    facet_wrap(~Dataset+Year) +
-    # Add the color scheme specific for the drugs present in the CDC WONDER subset.
-    scale_fill_manual(name = NULL, 
-                      labels = coloring[coloring$Drug %in% unique(waffle_2022$Drug), "Drug"],
-                      values = coloring[coloring$Drug %in% unique(waffle_2022$Drug), "Color"]) +
-    coord_equal() + theme_void(base_size = 16) + 
-    theme(legend.position = "bottom", legend.title = element_blank())
-  
-  
-  iron(w1, w2, w3)
-})
 
 
 
@@ -1331,15 +1314,14 @@ AHRQ hospitalizations
 
 ```{r}
 #| panel: fill
-plotlyOutput("ahrq_map")
-
+  ggplotly(ahrq_map_plot, tooltip = "text")
 ```
 
 CDC WONDER
 
 ```{r}
 #| panel: fill
-plotlyOutput("wonder_map")
+  ggplotly(wonder_map_plot, tooltip = "text")
 
 ```
 
@@ -1347,7 +1329,7 @@ plotlyOutput("wonder_map")
 
 ```{r}
 #| panel: fill
-plotOutput("waffle_plot")
+waffle::iron(w1, w2, w3)
 ```
 
 
