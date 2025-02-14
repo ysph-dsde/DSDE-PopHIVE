@@ -31,12 +31,14 @@ library(viridisLite)
 library(tigris)
 library(usmap)
 library(cowplot)
+library(shinyWidgets)
 library(viridis)
 library(sf)
 library(ggrepel)
 library(readxl)
 library(ggalluvial)
 library(waffle)
+source('./R/utils_mAb_VE.R')
 #library(cdcfluview)
 #install.packages("remotes")
 #remotes::install_github("hrbrmstr/cdcfluview")
@@ -74,18 +76,16 @@ yale_gradient <- c("#DDDDDD",
 #   cbind(State = states$name)
 ```
 
-## Welcome to PopHIVE 
-The goal of this platform is to collect and present timely and informative data on population health from a variety of sources, including traditional public health surveillance data, electronic health records, sewage testing, internet search trends, population surveys, and modeled outputs. We are just getting started and will be adding many more datasets and disease endpoints in the coming months. This project is hosted by the Yale School of Public Health. 
+## Welcome to PopHIVE
+
+The goal of this platform is to collect and present timely and informative data on population health from a variety of sources, including traditional public health surveillance data, electronic health records, sewage testing, internet search trends, population surveys, and modeled outputs. We are just getting started and will be adding many more datasets and disease endpoints in the coming months. This project is hosted by the Yale School of Public Health.
 
 ------------------------------------------------------------------------
-
 
 ## Respiratory viruses
 
 ::: panel-tabset
-
 ### RSV
-
 
 ```{r rsv_data}
 #| context: data
@@ -210,7 +210,6 @@ dwh <- cbind.data.frame(dwh,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
 #   collect() %>%
 #   as.data.frame()
 ```
-
 
 ```{r rsv_plots}
 #| context: server
@@ -409,17 +408,201 @@ print('Coming soon!')
 ```
 
 People searching for information on RSV often correlates well with actual clinical activity for RSV.
+
+#### Nirsevimab
+
+```{r nirsevimab_data}
+#| context: data
+#| include: false
+#| cache: true
+#| cache.extra: !expr file.info("data.csv")$mtime
+
+### read a list of input data 
+ve_datasets <- readRDS('./Data/nirsevimab_eff/ve_datasets.rds')
+
+# all the pull dates 
+pull_dates_range <- sort(unique(ve_datasets$ve.main$pull_date))
+
+```
+
+```{r nirsevimab_server}
+#| context: server
+
+ # ------------------------------------------------------
+  # Main VE plot (2 seasons)
+  # ------------------------------------------------------
+  output$plot_ve_main <- renderPlot({
+    data <- ve_datasets[["ve.main"]]
+    filtered_data <- data[data$pull_date == as.Date(input$date6), ] %>% 
+      dplyr::select(-pull_date)
+    
+    ve.2seasons <- rbind(filtered_data[1,], filtered_data[3,], filtered_data[2,], filtered_data[4,], filtered_data[5,]) %>% 
+      mutate(across(starts_with("n_"), ~str_replace(., " \\s*\\([^\\)]+\\)", ""))) 
+  
+    ve_forest_2rows(df.plot = ve.2seasons)
+  
+  }, height = function() {
+    # Dynamic height logic
+    return(400)  # returns height in pixels
+  }, width = function() {
+    # Dynamic width logic
+    return(1100)  # returns width in pixels
+  })
+
+# ------------------------------------------------------
+  # Waning VE (2 seasons, mono trend)
+  # ------------------------------------------------------
+  # output$plot_ve_wane_monotrend <- renderPlot({
+  #   
+  #   data <- ve_datasets[["ve.wane.monotrend"]]
+  #   filtered_data <- data[data$pull_date == as.Date(input$date9), ] %>% dplyr::select(-pull_date)
+  #   
+  #   df.plt.wane.biwk <- 
+  #     filtered_data %>%
+  #     mutate(
+  #       VE.median = as.numeric(str_extract(VE.adjusted, "^[0-9\\.]+")),
+  #   VE.lb = as.numeric(str_extract(VE.adjusted, "(?<=\\()[0-9\\.]+")),
+  #   VE.ub = as.numeric(str_extract(VE.adjusted, "(?<=-)[0-9\\.]+")),
+  #       time_since_vax = case_when(
+  #       vax_time == "(0, 2)" ~ "2",
+  #       vax_time == "[2, 4)" ~ "4",
+  #       vax_time == "[4, 6)" ~ "6",
+  #       vax_time == "[6, 8)" ~ "8",
+  #       vax_time == "[8, 10)" ~ "10",
+  #       vax_time == "[10, 12)" ~ "12",
+  #       vax_time == "[12, 14)" ~ "14",
+  #       vax_time == "[14, 16)" ~ "16",
+  #       vax_time == "[16, )" ~ "16+"
+  #     )) %>%
+  #     mutate(VE = paste0(round(VE.median), " (", round(VE.lb), ", ", round(VE.ub), ")")) %>% 
+  #     # mutate(time_since_vax = factor(time_since_vax, levels = c("(0, 2)", "[2, 4)", "[4, 6)", "[6, 8)",
+  #     #                                                           "[8, 10)", "[10, 12)", "[12, 14)", "[14, 16)", "[16, )"))) %>% 
+  #     mutate(time_since_vax = factor(time_since_vax, levels = c("2", "4", "6", "8",
+  #                                                               "10", "12", "14", "16", "16+"))) %>% 
+  #     mutate(against = paste0("Against ", against)) %>%
+  #     mutate(against = factor(against, levels = c("Against Medically attended RSV infection",
+  #                                                 "Against RSV outpatient visit",
+  #                                                 "Against RSV hospitalization",
+  #                                                 "Against RSV LRTI",
+  #                                                 "Against RSV LRTI hospitalization",
+  #                                                 "Against RSV severe outcomes")))
+  #   
+  #   df.no.arrow <- 
+  #     df.plt.wane.biwk %>%
+  #     mutate(add_arrow = ifelse(VE.lb <= -25, 1, 0)) %>%
+  #     mutate(VE.lb = ifelse(add_arrow == 1, -25, VE.lb)) %>% 
+  #     mutate(across(starts_with("VE"), ~ ifelse(add_arrow == 1, NA, .)))
+  #   
+  #   df.add.arrow <- 
+  #     df.plt.wane.biwk %>%
+  #     mutate(add_arrow = ifelse(VE.lb <= -25, 1, 0)) %>%
+  #     mutate(VE.lb = ifelse(add_arrow == 1, -25, VE.lb)) %>% 
+  #     mutate(across(starts_with("VE"), ~ ifelse(add_arrow != 1, NA, .)))
+  #   
+  #   
+  #   
+  #   plt.jags.wane.biwk <- 
+  #     ggplot() +
+  #     # if lb > -25
+  #     geom_point(aes(x = time_since_vax, y = VE.median), 
+  #                position = position_dodge(0.5), data = df.no.arrow) +
+  #     geom_errorbar(aes(x = time_since_vax, ymin = VE.lb, ymax = VE.ub), 
+  #                   width = 0, position = position_dodge(0.5), data = df.no.arrow) +
+  #     geom_text(aes(x = time_since_vax, y = VE.median-10, label = VE), 
+  #               angle = 90, position = position_dodge(0.5), vjust = - 0.7, show_guide = F,
+  #               size = 4.3, data = df.no.arrow) +
+  #     # if lb < -25
+  #     #geom_point(aes(x = time_since_vax, y = VE.median), 
+  #      #          position = position_dodge(0.5), data = df.add.arrow) +
+  #     geom_segment(aes(x = time_since_vax, xend = time_since_vax, 
+  #                      y = VE.ub, yend = VE.lb),
+  #                  arrow = arrow(length = unit(2, "mm")),
+  #                  position = position_dodge(0.5),
+  #                  data = df.add.arrow, show_guide = F) +
+  #     geom_text(aes(x = time_since_vax, y = VE.median-10, label = VE), 
+  #               angle = 90, position = position_dodge(0.5), vjust = - 0.7, show_guide = F,
+  #               size = 4.3, data = df.add.arrow) +
+  #     theme_classic() +
+  #     scale_color_brewer(palette = "Dark2") +
+  #     geom_hline(yintercept = 0, linetype = "dashed") +
+  #     ylab("Effectiveness of Nirsevimab (%)") +
+  #     xlab("Time since immunization (weeks)") +
+  #     labs(color = "Clinical endpoint") +
+  #     ylim(c(-25,100)) +
+  #     scale_y_continuous(breaks = c(-25, 0, 25, 50, 75, 100),
+  #                        labels = c("-25", "0", "25", "50", "75", "100")) +
+  #     facet_wrap( ~ against) +
+  #     theme(
+  #       #panel.grid.major = element_line(color = "grey", linewidth = 0.1), 
+  #       #panel.grid.minor = element_blank(),
+  #       axis.text.x = element_text(size = 12),
+  #       axis.title.x = element_text(size = 16),
+  #       axis.title.y = element_text(size = 16),
+  #       strip.text.x = element_text(size = 12), 
+  #       strip.text.y = element_text(size = 11)
+  #     )
+  #   
+  #   plt.jags.wane.biwk
+  #   
+  # }, height = function() {
+  #   # Dynamic height logic
+  #   return(800)  # returns height in pixels
+  # }, width = function() {
+  #   # Dynamic width logic
+  #   return(1200)  # returns width in pixels
+  # })
+  # 
+
+```
+
+```{r}
+#| panel: toolbar
+
+sliderTextInput("date6", "Data vintage date:",
+                                     choices = pull_dates_range,
+                                     selected = max(pull_dates_range),
+                                     grid = TRUE,
+                                     width = "100%"
+                     )
+```
+
+```{r}
+#| panel: fill
+
+  plotOutput("plot_ve_main", height = "400px", width = "1100px")
+
+```
+
+We are [monitoring](https://www.medrxiv.org/content/10.1101/2024.09.12.24313545v1)the effectiveness of nirsevimab in Connecticut, using the latest data. You can see how our estimates of VE evolve as new data accrue. Counts are rounded to the nearest 10. Analysis led by Hanmeng Xu and Carlos Oliveira.
+
+```{r}
+#| panel: toolbar
+
+ # sliderTextInput("date9", "Data pull date:",
+ #                                     choices = pull_dates_range,
+ #                                     selected = max(pull_dates_range),
+ #                                     grid = TRUE,
+ #                                     width = "100%"
+ #                     )
+```
+
+```{r}
+#| panel: fill
+
+ # plotOutput("plot_ve_wane_monotrend", height = "800px", width = "1200px")
+
+```
 :::
 
 RSV, a virus that infects the lungs, is an important cause of hospitalizations in infants and older adults. RSV rates tend to start increasing each year in the southeastern US in early autumn, with waves occurring later to the north and west over several months.
 
-
 ### Influenza
+
 Coming soon!
 
 ### SARS-CoV-2
-Coming soon!
 
+Coming soon!
 :::
 
 ------------------------------------------------------------------------
@@ -427,7 +610,6 @@ Coming soon!
 ## Vaccination
 
 Vaccination of children across the US, by state and vaccine. These data come from the [National Immunization Survey](https://data.cdc.gov/Child-Vaccinations/Vaccination-Coverage-among-Young-Children-0-35-Mon/fhky-rtsk/about_data) The size of the circle is proportional to the number of children participating in the survey. Caution should be used when interpreting these survey data.
-
 
 ```{r vax_data}
 #| context: data
@@ -597,7 +779,6 @@ Variation in vaccine uptake rates based on insurance status
 
 Pneumococcus is an important bacterial pathogen that causes severe disease like meningitis, blood-stream infections, and pneumonia. It also is a major cause of ear infections in children. Vaccines (PCVs) have been in use in the USA since 2000, with a switch to a new PCV that covered more strains in 2010. The introduction of these vaccines has largely led to the elimination of vaccine-targeted serotypes and smaller increases in disease caused by other serotypes. Some vaccine-targeted serotypes have recently re-emerged (e.g., 19F) for reasons that are still not clear.
 
-
 ```{r pneumococcus_data}
 #| context: data
 #| include: false
@@ -674,6 +855,7 @@ output$stGeographyPlot <- renderPlotly({
     ggtitle(input$select.st2)
 })
 ```
+
 ::: panel-tabset
 ### Trends in serotype frequency
 
@@ -1308,6 +1490,7 @@ output$opioid_bar_graph_2022 <- renderPlotly({
 
 
 ```
+
 ::: panel-tabset
 ### Trends in national healthcare incidents
 
@@ -1340,7 +1523,6 @@ CDC WONDER
 #| panel: fill
 waffle::iron(w1, w2, w3)
 ```
-
 :::
 
 ------------------------------------------------------------------------
