@@ -575,23 +575,7 @@ sliderTextInput("date6", "Data vintage date:",
 
 We are [monitoring](https://www.medrxiv.org/content/10.1101/2024.09.12.24313545v1)the effectiveness of nirsevimab in Connecticut, using the latest data. You can see how our estimates of VE evolve as new data accrue. Counts are rounded to the nearest 10. Analysis led by Hanmeng Xu and Carlos Oliveira.
 
-```{r}
-#| panel: toolbar
 
- # sliderTextInput("date9", "Data pull date:",
- #                                     choices = pull_dates_range,
- #                                     selected = max(pull_dates_range),
- #                                     grid = TRUE,
- #                                     width = "100%"
- #                     )
-```
-
-```{r}
-#| panel: fill
-
- # plotOutput("plot_ve_wane_monotrend", height = "800px", width = "1200px")
-
-```
 :::
 
 RSV, a virus that infects the lungs, is an important cause of hospitalizations in infants and older adults. RSV rates tend to start increasing each year in the southeastern US in early autumn, with waves occurring later to the north and west over several months.
