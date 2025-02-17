@@ -1521,6 +1521,9 @@ Coming soon!
 
 We thank all of the organizations and individuals who make their data available for health monitoring and research.
 
-Contributors include Shelby Golden, Howard Baik, Maurice Dalton, Megan Ranney, Bhramar Mukherjee, Katelyn Jetelina, Ron Borzekowski, Anne Zink, and Dan Weinberger
+Contributors include:
+Data wrangling, code, visualization: Shelby Golden, Howard Baik, Maurice Dalton, Deus Thindwa, Stephanie Perniciaro, Dan Weinberger 
+
+Project Leadership and Partners: Megan Ranney, Bhramar Mukherjee, Katelyn Jetelina, Ron Borzekowski, Anne Zink, and Dan Weinberger
 
 Questions or suggestions? Contact daniel dot weinberger at yale dot edu
