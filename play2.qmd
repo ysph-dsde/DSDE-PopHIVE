@@ -74,6 +74,19 @@ yale_gradient <- c("#DDDDDD",
 #   cbind(State = states$name)
 ```
 
+## Welcome to PopHIVE 
+The goal of this platform is to collect and present timely and informative data on population health from a variety of sources, including traditional public health surveillance data, electronic health records, sewage testing, internet search trends, population surveys, and modeled outputs. We are just getting started and will be adding many more datasets and disease endpoints in the coming months. This project is hosted by the Yale School of Public Health. 
+
+------------------------------------------------------------------------
+
+
+## Respiratory viruses
+
+::: panel-tabset
+
+### RSV
+
+
 ```{r rsv_data}
 #| context: data
 #| include: false
@@ -198,50 +211,223 @@ dwh <- cbind.data.frame(dwh,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
 #   as.data.frame()
 ```
 
-```{r pneumococcus_data}
-#| context: data
-#| include: false
-#| cache: true
-#| cache.extra: !expr file.info("data.csv")$mtime
+
+```{r rsv_plots}
+#| context: server
+
+########################################
+##RSV
+########################################
+output$distPlotRSV3 <- renderPlotly({
+  
+  point_plot <- rsv_ts %>% filter(hhs_abbr==input$hhs.region.select &  epiyr == max(epiyr, na.rm=T) ) %>%
+    filter(epiwk==max(epiwk))
+  
+  rsv_ts1 <- rsv_ts %>%
+    filter(x==input$hhs.region.select) %>%
+    ggplot(aes(x=epiwk, y=scaled_cases, group=as.factor(epiyr), color=as.factor(epiyr)))+
+    geom_line()+
+    theme_minimal()+
+    xlab('Weeks since July')+
+    ylab('RSV positive tests')+
+    scale_colour_viridis_d() +
+    geom_point(data=point_plot,aes(x=epiwk, y=scaled_cases) ,col='red') +
+    guides(color=guide_legend(title="Season starting:"))
+  
+  
+  ggplotly(rsv_ts1)
+})
 
 
-###Pneumococcal disease
-#csv_to_parquet('https://data.cdc.gov/resource/qvzb-qs6p.csv',path_to_parquet ='./Data/ipd_cdc1998.parquet')
+############################
+#https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/RSVStateLevelDownloadCSV.csv
 
-ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
-  rename(agec = "Age.Group..years.",
-         year=Year,
-         st=IPD.Serotype,
-         N_IPD = Frequency.Count) %>%
-  mutate( st= if_else(st=='16','16F', st),
-          agec1 = if_else(agec %in% c("Age <2","Age 2-4") ,1,2 ),
-          agec=gsub('Age ', '', agec),
-          agec2 = if_else( agec %in% c('<2','2-4'), '<5',
-                           if_else( agec %in% c('5-17','18-49'), '5-49',
-                                    if_else( agec %in% c('50-64','65+'), '50+',NA))),
-          agec2 = factor(agec2, levels=c('<5','5-49','50+'), labels=c('<5 years', '5-49 years', '50+ years') )
-  ) %>%
-  group_by(st,agec2, year) %>%
-  summarize(N_IPD=sum(N_IPD)) %>%
-  ungroup()
+output$distPlotRSV_dwh <- renderPlotly({
+  
+  # point_plot <- dwh %>% 
+  #   dplyr::select(state,date, percent_visits_rsv,rsv_ww,hosp_rate) %>%
+  #  filter(state==input$state.select2 ) %>%
+  #  reshape2::melt(id.vars=c('state','date')) %>%
+  #   group_by(variable) %>%
+  #   filter(date==max(date))
+  
+  rsv_ts_comp <- dwh %>%
+    filter(state==input$state.select2 & date >=as.Date('2023-07-01')) %>%
+    ggplot()+
+    geom_line(aes(x=date, y=percent_visits_rsv/max(percent_visits_rsv, na.rm=T), color='ED')) +
+    geom_line(aes(x=date, y=rsv_ww/max(rsv_ww, na.rm=T), color='WasteW')) +
+    geom_line(aes(x=date, y=hosp_rate/max(hosp_rate, na.rm=T),color='Hosp'), lty=2) +  
+    theme_minimal()+
+    xlab('Date')+
+    ylab('RSV activity')+
+    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a'  ))+
+    ggtitle(input$state.select2)
+  
+  scale_colour_viridis_d() 
+  
+  
+  ggplotly(rsv_ts_comp)
+})
 
-all.sts <- unique(ipd1$st)
 
+#hospitalization by age
+output$distPlotRSV_hosp_age <- renderPlotly({
+  
+  rsv_ts_comp <- h1.age %>%
+    filter(state==input$state.select3 & date >=as.Date('2023-07-01')) %>%
+    
+    ggplot()+
+    geom_line(aes(x=date, y=scale_age, group_by=Level, color=Level)) +
+    theme_minimal()+
+    xlab('Date')+
+    ylab('RSV activity')+
+    scale_colour_viridis_d() +
+    ggtitle(input$state.select3)
+  
+  ggplotly(rsv_ts_comp)
+})
 
-# pneumococcal serotype by state
-b2019 <- read.csv('./Data/pneumococcus/jiac058_suppl_supplementary_table_s2.csv') %>%
-  group_by(State, sero) %>%
-  summarize(N_cases=n()) %>%
-  mutate(sero=as.factor(sero)) %>%
-  ungroup() %>%
-  group_by(State, sero) %>%
-  mutate(mean_cases=max(N_cases,na.rm=T)
-  ) %>%
-  group_by(State) %>%
-  mutate(         pct = N_cases/sum(N_cases, na.rm=T)*100) %>%
-  ungroup() %>%
-  tidyr::complete(sero,State , fill=list(pct=0))  #fills 0
 ```
+
+::: panel-tabset
+#### Composite trends
+
+```{r}
+#| panel: toolbar
+
+selectInput("state.select2", "State:", 
+            choices=state.name, selected='New York')
+```
+
+```{r}
+#| panel: fill
+
+plotlyOutput("distPlotRSV_dwh")
+
+```
+
+Viral levels in the community can be measured in different ways. This plot shows how relying on data from the emergency department (ED), hospitalizations, and sewage surveillance can yield different estimates of epidemic timing. This could be because of who contributes to the different datasets: different age groups could contribute different aount of information to each line, and the location of the EDs and the location of the sewage sampling
+
+#### Trends in positive tests
+
+```{r}
+#| panel: toolbar
+
+selectInput("hhs.region.select", "HHS Region:", 
+            choices=unique(rsv_ts$hhs_abbr), selected='CT,ME,MA,NH,RI,VT')
+```
+
+```{r}
+#| panel: fill
+plotlyOutput("distPlotRSV3")
+
+```
+
+These data come from the NREVSS surveillance system, which is comprised of laboratories around the US
+
+#### Age patterns in hospitalization
+
+```{r}
+#| panel: toolbar
+
+selectInput("state.select3", "State:", 
+            choices=unique(h1.age$state), selected='New York')
+```
+
+```{r}
+#| panel: fill
+
+plotlyOutput("distPlotRSV_hosp_age")
+
+```
+
+The hospitalization data comes from the RSV-NET, a CDC-supported network of sites around the US that tracks hospitalizations from RSV, influenza, and COVID-19.
+
+#### Current national map (ED)
+
+```{r}
+#| panel: fill
+
+i=length(dates)-1
+d1 <- open_dataset('./Data/NSSP_detailed.parquet') %>%
+  filter(county!='All' & week_end==dates[i] ) %>%
+  mutate(
+    percent_visits_rsv=if_else(percent_visits_rsv>1,1,percent_visits_rsv) ,
+    
+    
+    percent_visits_combined=if_else(percent_visits_combined>10,10,percent_visits_combined) ) %>%
+  collect()
+
+p1 <- usmap::plot_usmap(regions='counties', data=d1,values='percent_visits_rsv' )   +
+  labs(title = paste0('RSV ED visits ', dates[i])) + 
+  theme(panel.background = element_rect(color = "white", fill = "white")) +
+  scale_fill_stepsn('RSV', breaks= seq(0,1, by=0.1), limits = c(0,1),
+                    colors=viridis_pal()(10),
+                    guide = guide_colorsteps(even.steps = FALSE))
+
+print(p1)
+```
+
+The maps shows the proportion of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
+
+#### Regional trends (NREVSS)
+
+```{r}
+heat1 <- rsv1_tests %>%
+  mutate(date= as.Date(substr(mmwrweek_end,1,10 ), '%m/%d/%Y'),
+         postdate= as.Date(substr(posted,1,10 ), '%m/%d/%Y')) %>%
+  filter(postdate==max(postdate)) %>% 
+  ungroup() %>%
+  filter(level != 'National') %>%
+  group_by(level ) %>%
+  left_join(key, by=c('level'='Group.1')) %>%
+  mutate(scaled_cases = pcr_detections/max(pcr_detections),
+         hhs_abbr=x)
+
+# by each district
+p2 <- ggplot(heat1, aes(date, x, fill = scaled_cases))+
+  geom_tile()+ 
+  scale_fill_distiller(name = "PCR Positives", 
+                       palette = "Blues", 
+                       direction = 1,
+                       breaks = pretty_breaks())+
+  theme(axis.text.y = element_text(size = 3))+
+  labs(x = "Date", y = "HHS Region", title ="RSV detections NREVSS")+
+  guides(fill="none")+
+  theme_minimal()
+p2
+```
+
+This dataset has viral test results from a network of laboratories around the US (NREVSS). The location of the labs doesn't necesarilycover the whole population in a state or region. The CDC only publishes these data at the region level
+
+#### Trends in Google searches
+
+```{r}
+#| panel: fill
+
+print('Coming soon!')
+```
+
+People searching for information on RSV often correlates well with actual clinical activity for RSV.
+:::
+
+RSV, a virus that infects the lungs, is an important cause of hospitalizations in infants and older adults. RSV rates tend to start increasing each year in the southeastern US in early autumn, with waves occurring later to the north and west over several months.
+
+
+### Influenza
+Coming soon!
+
+### SARS-CoV-2
+Coming soon!
+
+:::
+
+------------------------------------------------------------------------
+
+## Vaccination
+
+Vaccination of children across the US, by state and vaccine. These data come from the [National Immunization Survey](https://data.cdc.gov/Child-Vaccinations/Vaccination-Coverage-among-Young-Children-0-35-Mon/fhky-rtsk/about_data) The size of the circle is proportional to the number of children participating in the survey. Caution should be used when interpreting these survey data.
+
 
 ```{r vax_data}
 #| context: data
@@ -301,6 +487,372 @@ vax_insurance <- open_dataset('./Data/vax/peds_vax.parquet') %>%
 
 
 ```
+
+```{r vax_plots}
+#| context: server
+
+#vaccine urbanicity
+output$vax_urban_plot <- renderPlotly({
+  
+  plot_vax <- vax_urban %>% 
+    filter(Vaccine==input$select.vax2) %>% mutate(vax_order=as.numeric(as.factor(Vaccine)), Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
+    ggplot(aes(x = vax_uptake, y = urban, 
+               text=paste0(Geography, "<br>", 
+                           Vaccine_dose, "<br>",
+                           vax_uptake, "%" ))) +
+    geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
+    scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
+    labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
+    theme_minimal() + 
+    scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
+    theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, vjust = 0.5))
+  
+  ggplotly(plot_vax, tooltip='text') #display the plot
+  
+  
+})
+
+#vaccine, by insurance state
+output$vax_insurance_plot <- renderPlotly({
+  
+  plot_ins <- vax_insurance %>% 
+    filter(Vaccine==input$select.vax2) %>% mutate(vax_order=as.numeric(as.factor(Vaccine)),  
+                                                  Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
+    ggplot(aes(x = vax_uptake, y = insurance, 
+               text=paste0(Geography, "<br>", 
+                           Vaccine_dose, "<br>",
+                           vax_uptake, "%" ))) +
+    geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
+    scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
+    labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
+    theme_minimal() + 
+    scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
+    theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, 
+                                                                                                        vjust = 0.5))
+  
+  ggplotly(plot_ins, tooltip='text') #display the plot
+  
+})
+```
+
+::: panel-tabset
+### Uptake by state
+
+```{r, fig.width=5, fig.height=7}
+plot_vax <- vax_age %>% mutate(vax_order=as.numeric(as.factor(Vaccine)), Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
+  ggplot(aes(x = vax_uptake, y = Vaccine_dose, 
+             text=paste0(Geography, "<br>", 
+                         Vaccine_dose, "<br>",
+                         'Age: ',age, "<br>", 
+                         vax_uptake, "%" ))) +
+  geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.25, width = 0, alpha = 0.7) + 
+  scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
+  labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
+  theme_minimal() + 
+  scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, vjust = 0.5))
+
+ggplotly(plot_vax, tooltip='text')
+```
+
+### Uptake by urbanicity
+
+Variation in vaccine uptake based on how urban an area is.
+
+```{r}
+#| panel: toolbar
+
+selectInput("select.vax2", "Vaccine:", 
+            choices=unique(vax_urban$Vaccine), selected='PCV')
+```
+
+```{r}
+#| panel: fill
+#| layout-ncol: 1
+#| height: 1200px
+
+plotlyOutput("vax_urban_plot")
+
+```
+
+Variation in vaccine uptake based on how urban an area is. Uptake in non-urban, smaller urban, larger urban locations
+
+### Uptake based on insurance status
+
+```{r}
+#| panel: fill
+#| layout-ncol: 1
+#| height: 1200px
+
+plotlyOutput("vax_insurance_plot")
+
+```
+
+Variation in vaccine uptake rates based on insurance status
+:::
+
+------------------------------------------------------------------------
+
+## Pneumococcal disease in the United States
+
+Pneumococcus is an important bacterial pathogen that causes severe disease like meningitis, blood-stream infections, and pneumonia. It also is a major cause of ear infections in children. Vaccines (PCVs) have been in use in the USA since 2000, with a switch to a new PCV that covered more strains in 2010. The introduction of these vaccines has largely led to the elimination of vaccine-targeted serotypes and smaller increases in disease caused by other serotypes. Some vaccine-targeted serotypes have recently re-emerged (e.g., 19F) for reasons that are still not clear.
+
+
+```{r pneumococcus_data}
+#| context: data
+#| include: false
+#| cache: true
+#| cache.extra: !expr file.info("data.csv")$mtime
+
+
+###Pneumococcal disease
+#csv_to_parquet('https://data.cdc.gov/resource/qvzb-qs6p.csv',path_to_parquet ='./Data/ipd_cdc1998.parquet')
+
+ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
+  rename(agec = "Age.Group..years.",
+         year=Year,
+         st=IPD.Serotype,
+         N_IPD = Frequency.Count) %>%
+  mutate( st= if_else(st=='16','16F', st),
+          agec1 = if_else(agec %in% c("Age <2","Age 2-4") ,1,2 ),
+          agec=gsub('Age ', '', agec),
+          agec2 = if_else( agec %in% c('<2','2-4'), '<5',
+                           if_else( agec %in% c('5-17','18-49'), '5-49',
+                                    if_else( agec %in% c('50-64','65+'), '50+',NA))),
+          agec2 = factor(agec2, levels=c('<5','5-49','50+'), labels=c('<5 years', '5-49 years', '50+ years') )
+  ) %>%
+  group_by(st,agec2, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup()
+
+all.sts <- unique(ipd1$st)
+
+
+# pneumococcal serotype by state
+b2019 <- read.csv('./Data/pneumococcus/jiac058_suppl_supplementary_table_s2.csv') %>%
+  group_by(State, sero) %>%
+  summarize(N_cases=n()) %>%
+  mutate(sero=as.factor(sero)) %>%
+  ungroup() %>%
+  group_by(State, sero) %>%
+  mutate(mean_cases=max(N_cases,na.rm=T)
+  ) %>%
+  group_by(State) %>%
+  mutate(         pct = N_cases/sum(N_cases, na.rm=T)*100) %>%
+  ungroup() %>%
+  tidyr::complete(sero,State , fill=list(pct=0))  #fills 0
+```
+
+```{r pneumococcus_plots}
+#| context: server 
+#Pneumococcal disease
+output$stPlot <- renderPlotly({
+  p1 <- ipd1  %>%
+    filter(st %in% c(input$select.st)) %>%
+    ggplot(aes(x=year, y=N_IPD))+
+    geom_line()+
+    facet_wrap(~agec2, scales ='free', nrow=1) +
+    theme_classic()+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1.0, hjust=1)) +
+    geom_vline(xintercept=c(1999.5, 2009.5), lty=2, color='gray')+
+    ylim(0,NA) +
+    ggtitle(paste0('Trends in IPD caused by serotype ', input$select.st, ' in the US'))
+  ggplotly(p1)
+})
+
+
+#serotype geography
+output$stGeographyPlot <- renderPlotly({
+  
+  b2019 %>%
+    filter(sero==input$select.st2 ) %>%
+    ggplot( aes(fill=State, y=pct, x=sero)) +
+    geom_bar(position="dodge", stat="identity")+
+    scale_fill_viridis_d()+
+    theme_minimal()+
+    ylab('Proportion of IPD cases in the state') +
+    ggtitle(input$select.st2)
+})
+```
+::: panel-tabset
+### Trends in serotype frequency
+
+```{r}
+#| panel: toolbar
+selectInput("select.st",
+            "Select serotype:",
+            all.sts,
+            selected='19F')
+```
+
+```{r}
+#| panel: fill
+plotlyOutput("stPlot")
+
+```
+
+This shows trends in Invasive Pneumococcal Disease caused by different serotypes, as reported to the Active Bacterial Core Surevillance system (ABCs) at CDC. This is a network of 10 sites around the US.
+
+### Change in Invasive pneumococcal Disease 1998-2022
+
+```{r}
+#| include: false
+
+pcv7 <- c('4','6B','9V','14','18C','19F','23F')
+
+pcv10gsk <- c(pcv7,'1','5','7F')
+
+pcv13 <- c(pcv7, '1','3','5','6A','7F','19A')
+
+s1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
+  rename(agec = "Age.Group..years.",
+         year=Year,
+         st=IPD.Serotype,
+         N_IPD = Frequency.Count) %>%
+  mutate( st= if_else(st=='16','16F', st)) %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup() %>%
+  group_by(st) %>%
+  mutate(cum_N= sum(N_IPD)) %>%
+  filter(cum_N>100) %>%
+  ungroup() %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT'))
+s2_pre<- s1 %>%
+  filter(year %in% c(1998, 1999)) %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup() %>%
+  group_by(st) %>%
+  summarize(N_IPD_pre=mean(N_IPD)) %>%
+  ungroup() %>%
+  tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
+
+s2_pre13<- s1 %>%
+  filter(year %in% c(2008, 2009)) %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup() %>%
+  group_by(st) %>%
+  summarize(N_IPD_pre=mean(N_IPD)) %>%
+  ungroup() %>%
+  tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
+
+s2<- s1 %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>% #sum across age group
+  ungroup() %>%
+  tidyr::complete(st, year, fill=list(N_IPD=0))%>%  #fills 0
+  left_join(s2_pre, by='st') %>%
+  mutate(N_IPD_pre = if_else(is.na(N_IPD_pre),0, N_IPD_pre) ,
+         logRR = log((N_IPD+1)/(N_IPD_pre+1) )) 
+
+max_RR <- s2 %>%
+  group_by(st) %>%
+  summarize(max_RR = max(logRR)) %>%
+  arrange((max_RR))
+
+s2$st <- factor(s2$st, levels = max_RR$st)
+
+df_wide <- s2 %>%
+  dplyr::select(year, st, logRR) %>%
+  tidyr::pivot_wider(names_from = year, values_from = logRR)
+
+
+df_vt <- df_wide %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='VT') %>%
+  dplyr::select(-pcv13st) 
+
+df_nvt <- df_wide %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='NVT') %>%
+  dplyr::select(-pcv13st) 
+
+rr_nvt <- s2 %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='NVT') %>%
+  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  labs(x = "Year", y =
+         "serotype", fill = "log RR") +
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+rr_vt <- s2 %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='VT') %>%
+  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
+  geom_tile() +
+  #     guides(fill="none")+
+  
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  labs(x = "Year", y =
+         "serotype", fill = "log RR") +
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+```{r}
+#| panel: fill
+subplot(ggplotly(rr_vt), ggplotly(rr_nvt),  margin = 0.04)
+```
+
+This shows the decreases in serotypes targeted by PCV13 (left) and increases in the occurrence of non-vaccine serotypes (right) since 1998/1999
+
+### Geographic variation in serotype frequency
+
+Some serotypes have a similar distribution across the US, while others (e.g., serotype 4) have distinct geographic patterns. serotype 4 has been largely confined to the western US in recent years and is largely found among people who are homeless. Data from 2019 IPD (Beall et al, JID 2022 10.1093/infdis/jiac058)
+
+```{r}
+#| panel: toolbar
+selectInput("select.st2",
+            "Select serotype:",
+            unique(b2019$sero),
+            selected='19F')
+```
+
+```{r}
+#| panel: fill
+plotlyOutput("stGeographyPlot")
+
+```
+
+### Comparison of invasive pneumococcal disease and pneumonia
+
+```{r}
+ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
+  rename(agec = "Age.Group..years.",
+         year=Year,
+         st=IPD.Serotype,
+         N_IPD = Frequency.Count) %>%
+  mutate( st= if_else(st=='16','16F', st),
+          st = if_else(st %in% c('15B','15C'), '15BC',st),
+          if_else(st %in% c('6A','6C'), '6AC',st)
+  ) %>%
+  filter(year %in% c(2019,2020) & agec %in% c('Age 50-64','Age 65+')) %>%
+  group_by(st) %>%
+  summarize( N_IPD= sum(N_IPD))
+
+uad <- readxl::read_excel('./Data/pneumococcus/SSUAD/ramirez_ofid_2025_ofae727.xlsx') %>%
+  mutate(N_SSUAD= over65 + a50_64_with_indication + a50_64_no_indication ) %>%
+  full_join(ipd1, by='st') %>%
+  filter(!is.na(N_SSUAD) & !is.na(N_IPD))
+
+ggplot(uad, aes(x=N_IPD, y=N_SSUAD, label=st)) +
+  geom_point()+
+  geom_text( vjust = 1)+
+  theme_classic() +
+  ggtitle('IPD vs pneumonia 50+ years in US')
+```
+
+Most often, pneumococcal disease is diagnosed by isolating the bacteria from blood or cerebrospinal fluid. It is harder to determine what serotypes cause pneumonia. This study from Louisville, Kentucky found that the serotypes that are the most common causes of severe blood stream infections are also the most common causes of pneumonia. pneumonia [Ramirez et al OFID 2025](https://academic.oup.com/ofid/article/12/1/ofae727/7926903)
+:::
+
+------------------------------------------------------------------------
+
+## Opioids in the United States
 
 ```{r opioid_data}
 #| context: data
@@ -539,174 +1091,6 @@ waffle_2022 <- subset %>%
   
 ```
 
-```{r}
-
-
-#library(leaflet)
-#https://r-graph-gallery.com/183-choropleth-map-with-leaflet.html
-```
-
-## Welcome to PopHIVE 
-The goal of this platform is to collect and present timely and informative data on population health from a variety of sources, including traditional public health surveillance data, electronic health records, sewage testing, internet search trends, population surveys, and modeled outputs. We are just getting started and will be adding many more datasets and disease endpoints in the coming months. This project is hosted by the Yale School of Public Health. 
-
-------------------------------------------------------------------------
-
-```{r rsv_plots}
-#| context: server
-
-########################################
-##RSV
-########################################
-output$distPlotRSV3 <- renderPlotly({
-  
-  point_plot <- rsv_ts %>% filter(hhs_abbr==input$hhs.region.select &  epiyr == max(epiyr, na.rm=T) ) %>%
-    filter(epiwk==max(epiwk))
-  
-  rsv_ts1 <- rsv_ts %>%
-    filter(x==input$hhs.region.select) %>%
-    ggplot(aes(x=epiwk, y=scaled_cases, group=as.factor(epiyr), color=as.factor(epiyr)))+
-    geom_line()+
-    theme_minimal()+
-    xlab('Weeks since July')+
-    ylab('RSV positive tests')+
-    scale_colour_viridis_d() +
-    geom_point(data=point_plot,aes(x=epiwk, y=scaled_cases) ,col='red') +
-    guides(color=guide_legend(title="Season starting:"))
-  
-  
-  ggplotly(rsv_ts1)
-})
-
-
-############################
-#https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/RSVStateLevelDownloadCSV.csv
-
-output$distPlotRSV_dwh <- renderPlotly({
-  
-  # point_plot <- dwh %>% 
-  #   dplyr::select(state,date, percent_visits_rsv,rsv_ww,hosp_rate) %>%
-  #  filter(state==input$state.select2 ) %>%
-  #  reshape2::melt(id.vars=c('state','date')) %>%
-  #   group_by(variable) %>%
-  #   filter(date==max(date))
-  
-  rsv_ts_comp <- dwh %>%
-    filter(state==input$state.select2 & date >=as.Date('2023-07-01')) %>%
-    ggplot()+
-    geom_line(aes(x=date, y=percent_visits_rsv/max(percent_visits_rsv, na.rm=T), color='ED')) +
-    geom_line(aes(x=date, y=rsv_ww/max(rsv_ww, na.rm=T), color='WasteW')) +
-    geom_line(aes(x=date, y=hosp_rate/max(hosp_rate, na.rm=T),color='Hosp'), lty=2) +  
-    theme_minimal()+
-    xlab('Date')+
-    ylab('RSV activity')+
-    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a'  ))+
-    ggtitle(input$state.select2)
-  
-  scale_colour_viridis_d() 
-  
-  
-  ggplotly(rsv_ts_comp)
-})
-
-
-#hospitalization by age
-output$distPlotRSV_hosp_age <- renderPlotly({
-  
-  rsv_ts_comp <- h1.age %>%
-    filter(state==input$state.select3 & date >=as.Date('2023-07-01')) %>%
-    
-    ggplot()+
-    geom_line(aes(x=date, y=scale_age, group_by=Level, color=Level)) +
-    theme_minimal()+
-    xlab('Date')+
-    ylab('RSV activity')+
-    scale_colour_viridis_d() +
-    ggtitle(input$state.select3)
-  
-  ggplotly(rsv_ts_comp)
-})
-
-```
-
-```{r pneumococcus_plots}
-#| context: server 
-#Pneumococcal disease
-output$stPlot <- renderPlotly({
-  p1 <- ipd1  %>%
-    filter(st %in% c(input$select.st)) %>%
-    ggplot(aes(x=year, y=N_IPD))+
-    geom_line()+
-    facet_wrap(~agec2, scales ='free', nrow=1) +
-    theme_classic()+
-    theme(axis.text.x = element_text(angle = 45, vjust = 1.0, hjust=1)) +
-    geom_vline(xintercept=c(1999.5, 2009.5), lty=2, color='gray')+
-    ylim(0,NA) +
-    ggtitle(paste0('Trends in IPD caused by serotype ', input$select.st, ' in the US'))
-  ggplotly(p1)
-})
-
-
-#serotype geography
-output$stGeographyPlot <- renderPlotly({
-  
-  b2019 %>%
-    filter(sero==input$select.st2 ) %>%
-    ggplot( aes(fill=State, y=pct, x=sero)) +
-    geom_bar(position="dodge", stat="identity")+
-    scale_fill_viridis_d()+
-    theme_minimal()+
-    ylab('Proportion of IPD cases in the state') +
-    ggtitle(input$select.st2)
-})
-```
-
-```{r vax_plots}
-#| context: server
-
-#vaccine urbanicity
-output$vax_urban_plot <- renderPlotly({
-  
-  plot_vax <- vax_urban %>% 
-    filter(Vaccine==input$select.vax2) %>% mutate(vax_order=as.numeric(as.factor(Vaccine)), Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
-    ggplot(aes(x = vax_uptake, y = urban, 
-               text=paste0(Geography, "<br>", 
-                           Vaccine_dose, "<br>",
-                           vax_uptake, "%" ))) +
-    geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
-    scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
-    labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
-    theme_minimal() + 
-    scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
-    theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, vjust = 0.5))
-  
-  ggplotly(plot_vax, tooltip='text') #display the plot
-  
-  
-})
-
-#vaccine, by insurance state
-output$vax_insurance_plot <- renderPlotly({
-  
-  plot_ins <- vax_insurance %>% 
-    filter(Vaccine==input$select.vax2) %>% mutate(vax_order=as.numeric(as.factor(Vaccine)),  
-                                                  Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
-    ggplot(aes(x = vax_uptake, y = insurance, 
-               text=paste0(Geography, "<br>", 
-                           Vaccine_dose, "<br>",
-                           vax_uptake, "%" ))) +
-    geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
-    scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
-    labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
-    theme_minimal() + 
-    scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
-    theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, 
-                                                                                                        vjust = 0.5))
-  
-  ggplotly(plot_ins, tooltip='text') #display the plot
-  
-})
-```
-
 ```{r opioid_plots}
 #| context: server
 
@@ -924,393 +1308,6 @@ output$opioid_bar_graph_2022 <- renderPlotly({
 
 
 ```
-
-## Respiratory viruses
-
-::: panel-tabset
-
-### RSV
-
-::: panel-tabset
-#### Composite trends
-
-```{r}
-#| panel: toolbar
-
-selectInput("state.select2", "State:", 
-            choices=state.name, selected='New York')
-```
-
-```{r}
-#| panel: fill
-
-plotlyOutput("distPlotRSV_dwh")
-
-```
-
-Viral levels in the community can be measured in different ways. This plot shows how relying on data from the emergency department (ED), hospitalizations, and sewage surveillance can yield different estimates of epidemic timing. This could be because of who contributes to the different datasets: different age groups could contribute different aount of information to each line, and the location of the EDs and the location of the sewage sampling
-
-#### Trends in positive tests
-
-```{r}
-#| panel: toolbar
-
-selectInput("hhs.region.select", "HHS Region:", 
-            choices=unique(rsv_ts$hhs_abbr), selected='CT,ME,MA,NH,RI,VT')
-```
-
-```{r}
-#| panel: fill
-plotlyOutput("distPlotRSV3")
-
-```
-
-These data come from the NREVSS surveillance system, which is comprised of laboratories around the US
-
-#### Age patterns in hospitalization
-
-```{r}
-#| panel: toolbar
-
-selectInput("state.select3", "State:", 
-            choices=unique(h1.age$state), selected='New York')
-```
-
-```{r}
-#| panel: fill
-
-plotlyOutput("distPlotRSV_hosp_age")
-
-```
-
-The hospitalization data comes from the RSV-NET, a CDC-supported network of sites around the US that tracks hospitalizations from RSV, influenza, and COVID-19.
-
-#### Current national map (ED)
-
-```{r}
-#| panel: fill
-
-i=length(dates)-1
-d1 <- open_dataset('./Data/NSSP_detailed.parquet') %>%
-  filter(county!='All' & week_end==dates[i] ) %>%
-  mutate(
-    percent_visits_rsv=if_else(percent_visits_rsv>1,1,percent_visits_rsv) ,
-    
-    
-    percent_visits_combined=if_else(percent_visits_combined>10,10,percent_visits_combined) ) %>%
-  collect()
-
-p1 <- usmap::plot_usmap(regions='counties', data=d1,values='percent_visits_rsv' )   +
-  labs(title = paste0('RSV ED visits ', dates[i])) + 
-  theme(panel.background = element_rect(color = "white", fill = "white")) +
-  scale_fill_stepsn('RSV', breaks= seq(0,1, by=0.1), limits = c(0,1),
-                    colors=viridis_pal()(10),
-                    guide = guide_colorsteps(even.steps = FALSE))
-
-print(p1)
-```
-
-The maps shows the proportion of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
-
-#### Regional trends (NREVSS)
-
-```{r}
-heat1 <- rsv1_tests %>%
-  mutate(date= as.Date(substr(mmwrweek_end,1,10 ), '%m/%d/%Y'),
-         postdate= as.Date(substr(posted,1,10 ), '%m/%d/%Y')) %>%
-  filter(postdate==max(postdate)) %>% 
-  ungroup() %>%
-  filter(level != 'National') %>%
-  group_by(level ) %>%
-  left_join(key, by=c('level'='Group.1')) %>%
-  mutate(scaled_cases = pcr_detections/max(pcr_detections),
-         hhs_abbr=x)
-
-# by each district
-p2 <- ggplot(heat1, aes(date, x, fill = scaled_cases))+
-  geom_tile()+ 
-  scale_fill_distiller(name = "PCR Positives", 
-                       palette = "Blues", 
-                       direction = 1,
-                       breaks = pretty_breaks())+
-  theme(axis.text.y = element_text(size = 3))+
-  labs(x = "Date", y = "HHS Region", title ="RSV detections NREVSS")+
-  guides(fill="none")+
-  theme_minimal()
-p2
-```
-
-This dataset has viral test results from a network of laboratories around the US (NREVSS). The location of the labs doesn't necesarilycover the whole population in a state or region. The CDC only publishes these data at the region level
-
-#### Trends in Google searches
-
-```{r}
-#| panel: fill
-
-print('Coming soon!')
-```
-
-People searching for information on RSV often correlates well with actual clinical activity for RSV.
-:::
-
-RSV, a virus that infects the lungs, is an important cause of hospitalizations in infants and older adults. RSV rates tend to start increasing each year in the southeastern US in early autumn, with waves occurring later to the north and west over several months.
-
-
-### Influenza
-Coming soon!
-
-### SARS-CoV-2
-Coming soon!
-
-:::
-------------------------------------------------------------------------
-
-## Pneumococcal disease in the United States
-
-Pneumococcus is an important bacterial pathogen that causes severe disease like meningitis, blood-stream infections, and pneumonia. It also is a major cause of ear infections in children. Vaccines (PCVs) have been in use in the USA since 2000, with a switch to a new PCV that covered more strains in 2010. The introduction of these vaccines has largely led to the elimination of vaccine-targeted serotypes and smaller increases in disease caused by other serotypes. Some vaccine-targeted serotypes have recently re-emerged (e.g., 19F) for reasons that are still not clear.
-
-::: panel-tabset
-### Trends in serotype frequency
-
-```{r}
-#| panel: toolbar
-selectInput("select.st",
-            "Select serotype:",
-            all.sts,
-            selected='19F')
-```
-
-```{r}
-#| panel: fill
-plotlyOutput("stPlot")
-
-```
-
-This shows trends in Invasive Pneumococcal Disease caused by different serotypes, as reported to the Active Bacterial Core Surevillance system (ABCs) at CDC. This is a network of 10 sites around the US.
-
-### Change in Invasive pneumococcal Disease 1998-2022
-
-```{r}
-#| include: false
-
-pcv7 <- c('4','6B','9V','14','18C','19F','23F')
-
-pcv10gsk <- c(pcv7,'1','5','7F')
-
-pcv13 <- c(pcv7, '1','3','5','6A','7F','19A')
-
-s1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
-  rename(agec = "Age.Group..years.",
-         year=Year,
-         st=IPD.Serotype,
-         N_IPD = Frequency.Count) %>%
-  mutate( st= if_else(st=='16','16F', st)) %>%
-  group_by(st, year) %>%
-  summarize(N_IPD=sum(N_IPD)) %>%
-  ungroup() %>%
-  group_by(st) %>%
-  mutate(cum_N= sum(N_IPD)) %>%
-  filter(cum_N>100) %>%
-  ungroup() %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT'))
-s2_pre<- s1 %>%
-  filter(year %in% c(1998, 1999)) %>%
-  group_by(st, year) %>%
-  summarize(N_IPD=sum(N_IPD)) %>%
-  ungroup() %>%
-  group_by(st) %>%
-  summarize(N_IPD_pre=mean(N_IPD)) %>%
-  ungroup() %>%
-  tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
-
-s2_pre13<- s1 %>%
-  filter(year %in% c(2008, 2009)) %>%
-  group_by(st, year) %>%
-  summarize(N_IPD=sum(N_IPD)) %>%
-  ungroup() %>%
-  group_by(st) %>%
-  summarize(N_IPD_pre=mean(N_IPD)) %>%
-  ungroup() %>%
-  tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
-
-s2<- s1 %>%
-  group_by(st, year) %>%
-  summarize(N_IPD=sum(N_IPD)) %>% #sum across age group
-  ungroup() %>%
-  tidyr::complete(st, year, fill=list(N_IPD=0))%>%  #fills 0
-  left_join(s2_pre, by='st') %>%
-  mutate(N_IPD_pre = if_else(is.na(N_IPD_pre),0, N_IPD_pre) ,
-         logRR = log((N_IPD+1)/(N_IPD_pre+1) )) 
-
-max_RR <- s2 %>%
-  group_by(st) %>%
-  summarize(max_RR = max(logRR)) %>%
-  arrange((max_RR))
-
-s2$st <- factor(s2$st, levels = max_RR$st)
-
-df_wide <- s2 %>%
-  dplyr::select(year, st, logRR) %>%
-  tidyr::pivot_wider(names_from = year, values_from = logRR)
-
-
-df_vt <- df_wide %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
-  filter(pcv13st =='VT') %>%
-  dplyr::select(-pcv13st) 
-
-df_nvt <- df_wide %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
-  filter(pcv13st =='NVT') %>%
-  dplyr::select(-pcv13st) 
-
-rr_nvt <- s2 %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
-  filter(pcv13st =='NVT') %>%
-  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
-  geom_tile() +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
-  labs(x = "Year", y =
-         "serotype", fill = "log RR") +
-  theme_minimal()+
-  theme(axis.text.x=element_text(angle=45, hjust=1))
-
-rr_vt <- s2 %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
-  filter(pcv13st =='VT') %>%
-  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
-  geom_tile() +
-  #     guides(fill="none")+
-  
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
-  labs(x = "Year", y =
-         "serotype", fill = "log RR") +
-  theme_minimal()+
-  theme(axis.text.x=element_text(angle=45, hjust=1))
-```
-
-```{r}
-#| panel: fill
-subplot(ggplotly(rr_vt), ggplotly(rr_nvt),  margin = 0.04)
-```
-
-This shows the decreases in serotypes targeted by PCV13 (left) and increases in the occurrence of non-vaccine serotypes (right) since 1998/1999
-
-### Geographic variation in serotype frequency
-
-Some serotypes have a similar distribution across the US, while others (e.g., serotype 4) have distinct geographic patterns. serotype 4 has been largely confined to the western US in recent years and is largely found among people who are homeless. Data from 2019 IPD (Beall et al, JID 2022 10.1093/infdis/jiac058)
-
-```{r}
-#| panel: toolbar
-selectInput("select.st2",
-            "Select serotype:",
-            unique(b2019$sero),
-            selected='19F')
-```
-
-```{r}
-#| panel: fill
-plotlyOutput("stGeographyPlot")
-
-```
-
-### Comparison of invasive pneumococcal disease and pneumonia
-
-```{r}
-ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
-  rename(agec = "Age.Group..years.",
-         year=Year,
-         st=IPD.Serotype,
-         N_IPD = Frequency.Count) %>%
-  mutate( st= if_else(st=='16','16F', st),
-          st = if_else(st %in% c('15B','15C'), '15BC',st),
-          if_else(st %in% c('6A','6C'), '6AC',st)
-  ) %>%
-  filter(year %in% c(2019,2020) & agec %in% c('Age 50-64','Age 65+')) %>%
-  group_by(st) %>%
-  summarize( N_IPD= sum(N_IPD))
-
-uad <- readxl::read_excel('./Data/pneumococcus/SSUAD/ramirez_ofid_2025_ofae727.xlsx') %>%
-  mutate(N_SSUAD= over65 + a50_64_with_indication + a50_64_no_indication ) %>%
-  full_join(ipd1, by='st') %>%
-  filter(!is.na(N_SSUAD) & !is.na(N_IPD))
-
-ggplot(uad, aes(x=N_IPD, y=N_SSUAD, label=st)) +
-  geom_point()+
-  geom_text( vjust = 1)+
-  theme_classic() +
-  ggtitle('IPD vs pneumonia 50+ years in US')
-```
-
-Most often, pneumococcal disease is diagnosed by isolating the bacteria from blood or cerebrospinal fluid. It is harder to determine what serotypes cause pneumonia. This study from Louisville, Kentucky found that the serotypes that are the most common causes of severe blood stream infections are also the most common causes of pneumonia. pneumonia [Ramirez et al OFID 2025](https://academic.oup.com/ofid/article/12/1/ofae727/7926903)
-:::
-
-------------------------------------------------------------------------
-
-## Vaccination
-
-Vaccination of children across the US, by state and vaccine. These data come from the [National Immunization Survey](https://data.cdc.gov/Child-Vaccinations/Vaccination-Coverage-among-Young-Children-0-35-Mon/fhky-rtsk/about_data) The size of the circle is proportional to the number of children participating in the survey. Caution should be used when interpreting these survey data.
-
-::: panel-tabset
-### Uptake by state
-
-```{r, fig.width=5, fig.height=7}
-plot_vax <- vax_age %>% mutate(vax_order=as.numeric(as.factor(Vaccine)), Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
-  ggplot(aes(x = vax_uptake, y = Vaccine_dose, 
-             text=paste0(Geography, "<br>", 
-                         Vaccine_dose, "<br>",
-                         'Age: ',age, "<br>", 
-                         vax_uptake, "%" ))) +
-  geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.25, width = 0, alpha = 0.7) + 
-  scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
-  labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
-  theme_minimal() + 
-  scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
-  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, vjust = 0.5))
-
-ggplotly(plot_vax, tooltip='text')
-```
-
-### Uptake by urbanicity
-
-Variation in vaccine uptake based on how urban an area is.
-
-```{r}
-#| panel: toolbar
-
-selectInput("select.vax2", "Vaccine:", 
-            choices=unique(vax_urban$Vaccine), selected='PCV')
-```
-
-```{r}
-#| panel: fill
-#| layout-ncol: 1
-#| height: 1200px
-
-plotlyOutput("vax_urban_plot")
-
-```
-
-Variation in vaccine uptake based on how urban an area is. Uptake in non-urban, smaller urban, larger urban locations
-
-### Uptake based on insurance status
-
-```{r}
-#| panel: fill
-#| layout-ncol: 1
-#| height: 1200px
-
-plotlyOutput("vax_insurance_plot")
-
-```
-
-Variation in vaccine uptake rates based on insurance status
-:::
-
-------------------------------------------------------------------------
-
-## Opioids in the United States
-
 ::: panel-tabset
 ### Trends in national healthcare incidents
 
@@ -1343,8 +1340,6 @@ CDC WONDER
 #| panel: fill
 waffle::iron(w1, w2, w3)
 ```
-
-
 
 :::
 
