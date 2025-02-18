@@ -110,6 +110,27 @@ e1 <- readr::read_csv('./Data/CONFIDENTIAL/RSVICD10week_age_state.csv', skip=15,
 e1_all_ages <- e1 %>% filter(age=='Total') %>%
   rename(state=geography, N_epic=N_cases) 
 
+e1_age <-  e1 %>% filter(age!='Total' & geography !='United States' & age != 'No value') %>%
+  mutate( Level = if_else(age == 'Less than 1 years', '<1 Years',
+                          if_else( age=='? 1 and < 5 years','1-4 Years',
+                                   if_else(age=='? 5 and < 18 years' , "5-17 Years",
+                                   if_else( age=="? 18 and < 50 years" ,"18-49 Years" ,         
+                                   if_else( age=="? 50 and < 65 years" , "50-64 Years" ,        
+                                   if_else( age=="? 65 and < 75 years" ,"65-74 Years",          
+                                 if_else( age=="75 years or more" , "75+ Years", NA_character_         
+                                           ) )))))
+                          )) %>%
+  dplyr::select(-age) %>%
+  ungroup() %>%
+  arrange( geography,Level, date) %>%
+  group_by( geography,Level) %>%
+  rename(N_cases_epic=N_cases) %>%
+  filter(date>='2023-07-01') %>%
+  mutate( N_cases_epic_3m=zoo::rollmean(N_cases_epic, k = 3, fill = NA, align='right'),
+        max_grp= max(N_cases_epic_3m, na.rm=T),
+         scale_age_epic = N_cases_epic_3m/max_grp*100
+        ) %>%
+  ungroup()
 
 # e1_all_ages <- readr::read_csv('./Data/CONFIDENTIAL/RSVICD10week_state.csv', skip=15, col_names=F) %>%
 #   rename(geography=X1) %>%
@@ -152,7 +173,7 @@ rsv_ts <- rsv1_tests %>%
   filter(level != 'National') %>%
   group_by(level ) %>%
   left_join(key, by=c('level'='Group.1')) %>%
-  mutate(scaled_cases = pcr_detections/max(pcr_detections),
+  mutate(scaled_cases = pcr_detections/max(pcr_detections)*100,
          hhs_abbr = x  ) %>%
   ungroup()
 
@@ -205,8 +226,9 @@ h1.age <- open_dataset('./Data/rsvnet_hosp.parquet') %>%
   ungroup() %>%
   filter( date >=as.Date('2023-07-01')) %>%
   group_by(state, Level) %>%
-  mutate(scale_age=hosp_rate/max(hosp_rate, na.rm=T ),
-         scale_age=zoo::rollmean(scale_age, k = 3, fill = NA, align='right')) %>%
+  mutate(hosp_rate_3m=zoo::rollmean(hosp_rate, k = 3, fill = NA, align='right'),
+         scale_age=hosp_rate_3m/max(hosp_rate_3m, na.rm=T )*100,
+         ) %>%
   as.data.frame()
 
 #Wastewaster by state and date
@@ -233,15 +255,18 @@ dwh <- d1 %>%
   left_join(e1_all_ages, by=c('state','date')) %>%
   arrange(state, date) %>%
   group_by(state) %>%
-  mutate(percent_visits_rsv = percent_visits_rsv / max(percent_visits_rsv, na.rm=T),
-        rsv_ww= rsv_ww/max(rsv_ww, na.rm=T),
-       hosp_rate=hosp_rate/max(hosp_rate, na.rm=T),
-       N_epic = N_epic/max(N_epic, na.rm=T),
+  filter(date>='2023-07-01') %>%
+  mutate(percent_visits_rsv_3m = zoo::rollmean(percent_visits_rsv, k = 3, fill = NA, align='right'),
+        rsv_ww_3m = zoo::rollmean(rsv_ww, k = 3, fill = NA, align='right'),
+        hosp_rate_3m = zoo::rollmean(hosp_rate, k = 3, fill = NA, align='right'),
+        N_epic_3m = zoo::rollmean(N_epic, k = 3, fill = NA, align='right'),
+    
+    percent_visits_rsv_3m = percent_visits_rsv_3m / max(percent_visits_rsv_3m, na.rm=T)*100,
+        rsv_ww_3m= rsv_ww_3m/max(rsv_ww_3m, na.rm=T)*100,
+       hosp_rate_3m=hosp_rate_3m/max(hosp_rate_3m, na.rm=T)*100,
+       N_epic_3m = N_epic_3m/max(N_epic_3m, na.rm=T)*100,
        
-       percent_visits_rsv = zoo::rollmean(percent_visits_rsv, k = 3, fill = NA, align='right'),
-        rsv_ww = zoo::rollmean(rsv_ww, k = 3, fill = NA, align='right'),
-        hosp_rate = zoo::rollmean(hosp_rate, k = 3, fill = NA, align='right'),
-        N_epic = zoo::rollmean(N_epic, k = 3, fill = NA, align='right'),
+       
        
        
        
@@ -311,10 +336,10 @@ output$distPlotRSV_dwh <- renderPlotly({
   rsv_ts_comp <- dwh %>%
     filter(state==input$state.select2 & date >=as.Date('2023-07-01')) %>%
     ggplot()+
-  geom_line(aes(x=date, y=percent_visits_rsv, color='ED'), lty=3) +
-  geom_line(aes(x=date, y=rsv_ww, color='WasteW')) +
-  geom_line(aes(x=date, y=hosp_rate,color='Hosp'), lty=2) +  
-  geom_line(aes(x=date, y=N_epic,color='Epic'), lty=1) +  
+  geom_line(aes(x=date, y=percent_visits_rsv_3m, color='ED'), lty=3) +
+  geom_line(aes(x=date, y=rsv_ww_3m, color='WasteW')) +
+  geom_line(aes(x=date, y=hosp_rate_3m,color='Hosp'), lty=2) +  
+  geom_line(aes(x=date, y=N_epic_3m,color='Epic'), lty=1) +  
         theme_minimal()+
     xlab('Date')+
     ylab('RSV activity')+
@@ -338,11 +363,29 @@ output$distPlotRSV_hosp_age <- renderPlotly({
     geom_line(aes(x=date, y=scale_age, group_by=Level, color=Level)) +
     theme_minimal()+
     xlab('Date')+
-    ylab('RSV activity')+
+    ylab('RSV activity (CDC surveillance)')+
     scale_colour_viridis_d() +
-    ggtitle(input$state.select3)
+    ggtitle(paste0(input$state.select3, ' CDC hospital surveillance'))
   
   ggplotly(rsv_ts_comp)
+})
+
+
+#epic by age
+output$distPlotRSV_epic_age <- renderPlotly({
+  
+  rsv_epic_ts_comp <- e1_age %>%
+    filter(geography==input$state.select3 & date >=as.Date('2023-07-01')) %>%
+    
+    ggplot()+
+    geom_line(aes(x=date, y=scale_age_epic, group_by=Level, color=Level)) +
+    theme_minimal()+
+    xlab('Date')+
+    ylab('RSV activity (Epic Cosmos)')+
+    scale_colour_viridis_d() +
+    ggtitle(paste0(input$state.select3, ' Epic Cosmos'))
+  
+  ggplotly(rsv_epic_ts_comp)
 })
 
 ```
@@ -397,9 +440,14 @@ selectInput("state.select3", "State:",
 ```{r}
 #| panel: fill
 
+plotlyOutput("distPlotRSV_epic_age")
+
 plotlyOutput("distPlotRSV_hosp_age")
 
+
 ```
+
+
 
 The hospitalization data comes from the RSV-NET, a CDC-supported network of sites around the US that tracks hospitalizations from RSV, influenza, and COVID-19. Data are smoothed with a 3 week average for vizualization.
 
