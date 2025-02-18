@@ -74,24 +74,65 @@ yale_gradient <- c("#DDDDDD",
 #   cbind(State = states$name)
 ```
 
-## Welcome to PopHIVE 
-The goal of this platform is to collect and present timely and informative data on population health from a variety of sources, including traditional public health surveillance data, electronic health records, sewage testing, internet search trends, population surveys, and modeled outputs. We are just getting started and will be adding many more datasets and disease endpoints in the coming months. This project is hosted by the Yale School of Public Health. 
+## Welcome to PopHIVE
+
+This platform is designed to give you timely, clear, and useful insights into community health, so you can make informed decisions for yourself, your family, and your community. We bring together data from multiple sources—like public health reports, electronic health records, sewage testing, online search trends, surveys, and predictive models—to help paint a fuller picture of health trends. We're just getting started and will be adding even more data and disease insights in the coming months. This project is led by the Yale School of Public Health.
 
 ------------------------------------------------------------------------
-
 
 ## Respiratory viruses
 
 ::: panel-tabset
+### Respiratory Syncytial Virus (RSV)
 
-### RSV
+*RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months.*
 
+```{r epic_data}
+#| context: data
+#| include: false
+
+
+e1 <- readr::read_csv('./Data/CONFIDENTIAL/RSVICD10week_age_state.csv', skip=15, col_names=F) %>%
+  rename(geography=X1, age=X2) %>%
+  tidyr::fill( geography, .direction = 'down') %>%
+  reshape2::melt(., id.vars=c('geography','age')) %>%
+  arrange(geography, age, variable) %>%
+  group_by(geography, age) %>%
+  #week END date
+  mutate(date= seq.Date(from=as.Date('2019-01-12'), length.out=n() , by='week')) %>%
+  ungroup() %>%
+  rename(N_cases=value) %>%
+ mutate( N_cases = if_else(N_cases=='10 or fewer',NA_character_, N_cases),
+         N_cases = as.numeric(N_cases),
+         geography= if_else(geography=='Total', 'United States', geography)) %>%
+  dplyr::select(-variable)
+
+e1_all_ages <- e1 %>% filter(age=='Total') %>%
+  rename(state=geography, N_epic=N_cases) 
+
+
+# e1_all_ages <- readr::read_csv('./Data/CONFIDENTIAL/RSVICD10week_state.csv', skip=15, col_names=F) %>%
+#   rename(geography=X1) %>%
+#   tidyr::fill( geography, .direction = 'down') %>%
+#   reshape2::melt(., id.vars=c('geography')) %>%
+#   arrange(geography, variable) %>%
+#   group_by(geography) %>%
+#   #Date based on week END
+#   mutate(date= seq.Date(from=as.Date('2019-01-12'), length.out=n() , by='week')) %>%
+#   ungroup() %>%
+#   rename(N_cases=value) %>%
+#  mutate( N_cases = if_else(N_cases=='10 or fewer',NA_character_, N_cases),
+#          N_cases = as.numeric(N_cases),
+#          geography= if_else(geography=='Total', 'United States', geography)) %>%
+#   dplyr::select(-variable) %>%
+#   rename(state=geography, N_epic=N_cases)
+
+
+```
 
 ```{r rsv_data}
 #| context: data
 #| include: false
-#| cache: true
-#| cache.extra: !expr file.info("data.csv")$mtime
 
 
 #csv_to_parquet('https://raw.githubusercontent.com/ysph-dsde/data-gov/refs/heads/main/RSV%20Infections%20Data/Raw%20Download/NREVSS%20by%20HHS%20Region_Respiratory%20Syncytial%20Virus%20(RSV)%20Surveillance%20Archive_Downloaded%2001.23.2025.csv',path_to_parquet ='./Data/rsv_testing.parquet')
@@ -164,7 +205,8 @@ h1.age <- open_dataset('./Data/rsvnet_hosp.parquet') %>%
   ungroup() %>%
   filter( date >=as.Date('2023-07-01')) %>%
   group_by(state, Level) %>%
-  mutate(scale_age=hosp_rate/max(hosp_rate, na.rm=T )) %>%
+  mutate(scale_age=hosp_rate/max(hosp_rate, na.rm=T ),
+         scale_age=zoo::rollmean(scale_age, k = 3, fill = NA, align='right')) %>%
   as.data.frame()
 
 #Wastewaster by state and date
@@ -187,7 +229,23 @@ d1 <- open_dataset('./Data/NSSP_detailed.parquet') %>%
 #combine hospital, wastewater, ED visits
 dwh <- d1 %>%
   full_join(w1, by=c('state','date')) %>%
-  full_join(h1, by=c('state', 'date'))
+  full_join(h1, by=c('state', 'date')) %>%
+  left_join(e1_all_ages, by=c('state','date')) %>%
+  arrange(state, date) %>%
+  group_by(state) %>%
+  mutate(percent_visits_rsv = percent_visits_rsv / max(percent_visits_rsv, na.rm=T),
+        rsv_ww= rsv_ww/max(rsv_ww, na.rm=T),
+       hosp_rate=hosp_rate/max(hosp_rate, na.rm=T),
+       N_epic = N_epic/max(N_epic, na.rm=T),
+       
+       percent_visits_rsv = zoo::rollmean(percent_visits_rsv, k = 3, fill = NA, align='right'),
+        rsv_ww = zoo::rollmean(rsv_ww, k = 3, fill = NA, align='right'),
+        hosp_rate = zoo::rollmean(hosp_rate, k = 3, fill = NA, align='right'),
+        N_epic = zoo::rollmean(N_epic, k = 3, fill = NA, align='right'),
+       
+       
+       
+       )
 
 dates2 <- MMWRweek(as.Date(dwh$date))
 
@@ -210,7 +268,6 @@ dwh <- cbind.data.frame(dwh,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
 #   collect() %>%
 #   as.data.frame()
 ```
-
 
 ```{r rsv_plots}
 #| context: server
@@ -254,13 +311,14 @@ output$distPlotRSV_dwh <- renderPlotly({
   rsv_ts_comp <- dwh %>%
     filter(state==input$state.select2 & date >=as.Date('2023-07-01')) %>%
     ggplot()+
-    geom_line(aes(x=date, y=percent_visits_rsv/max(percent_visits_rsv, na.rm=T), color='ED')) +
-    geom_line(aes(x=date, y=rsv_ww/max(rsv_ww, na.rm=T), color='WasteW')) +
-    geom_line(aes(x=date, y=hosp_rate/max(hosp_rate, na.rm=T),color='Hosp'), lty=2) +  
-    theme_minimal()+
+  geom_line(aes(x=date, y=percent_visits_rsv, color='ED'), lty=3) +
+  geom_line(aes(x=date, y=rsv_ww, color='WasteW')) +
+  geom_line(aes(x=date, y=hosp_rate,color='Hosp'), lty=2) +  
+  geom_line(aes(x=date, y=N_epic,color='Epic'), lty=1) +  
+        theme_minimal()+
     xlab('Date')+
     ylab('RSV activity')+
-    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a'  ))+
+    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a', 'Epic'='#984ea3'  ))+
     ggtitle(input$state.select2)
   
   scale_colour_viridis_d() 
@@ -290,7 +348,7 @@ output$distPlotRSV_hosp_age <- renderPlotly({
 ```
 
 ::: panel-tabset
-#### Composite trends
+#### Overall Trends
 
 ```{r}
 #| panel: toolbar
@@ -306,14 +364,16 @@ plotlyOutput("distPlotRSV_dwh")
 
 ```
 
-Viral levels in the community can be measured in different ways. This plot shows how relying on data from the emergency department (ED), hospitalizations, and sewage surveillance can yield different estimates of epidemic timing. This could be because of who contributes to the different datasets: different age groups could contribute different aount of information to each line, and the location of the EDs and the location of the sewage sampling
+|                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+|------------------------------------------------------------------------|
+| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us).  |
 
 #### Trends in positive tests
 
 ```{r}
 #| panel: toolbar
 
-selectInput("hhs.region.select", "HHS Region:", 
+selectInput("hhs.region.select", "Region:", 
             choices=unique(rsv_ts$hhs_abbr), selected='CT,ME,MA,NH,RI,VT')
 ```
 
@@ -325,7 +385,7 @@ plotlyOutput("distPlotRSV3")
 
 These data come from the NREVSS surveillance system, which is comprised of laboratories around the US
 
-#### Age patterns in hospitalization
+#### Severe disease (by age)
 
 ```{r}
 #| panel: toolbar
@@ -341,9 +401,9 @@ plotlyOutput("distPlotRSV_hosp_age")
 
 ```
 
-The hospitalization data comes from the RSV-NET, a CDC-supported network of sites around the US that tracks hospitalizations from RSV, influenza, and COVID-19.
+The hospitalization data comes from the RSV-NET, a CDC-supported network of sites around the US that tracks hospitalizations from RSV, influenza, and COVID-19. Data are smoothed with a 3 week average for vizualization.
 
-#### Current national map (ED)
+#### Emergency Department Visits
 
 ```{r}
 #| panel: fill
@@ -370,36 +430,6 @@ print(p1)
 
 The maps shows the proportion of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
 
-#### Regional trends (NREVSS)
-
-```{r}
-heat1 <- rsv1_tests %>%
-  mutate(date= as.Date(substr(mmwrweek_end,1,10 ), '%m/%d/%Y'),
-         postdate= as.Date(substr(posted,1,10 ), '%m/%d/%Y')) %>%
-  filter(postdate==max(postdate)) %>% 
-  ungroup() %>%
-  filter(level != 'National') %>%
-  group_by(level ) %>%
-  left_join(key, by=c('level'='Group.1')) %>%
-  mutate(scaled_cases = pcr_detections/max(pcr_detections),
-         hhs_abbr=x)
-
-# by each district
-p2 <- ggplot(heat1, aes(date, x, fill = scaled_cases))+
-  geom_tile()+ 
-  scale_fill_distiller(name = "PCR Positives", 
-                       palette = "Blues", 
-                       direction = 1,
-                       breaks = pretty_breaks())+
-  theme(axis.text.y = element_text(size = 3))+
-  labs(x = "Date", y = "HHS Region", title ="RSV detections NREVSS")+
-  guides(fill="none")+
-  theme_minimal()
-p2
-```
-
-This dataset has viral test results from a network of laboratories around the US (NREVSS). The location of the labs doesn't necesarilycover the whole population in a state or region. The CDC only publishes these data at the region level
-
 #### Trends in Google searches
 
 ```{r}
@@ -411,23 +441,20 @@ print('Coming soon!')
 People searching for information on RSV often correlates well with actual clinical activity for RSV.
 :::
 
-RSV, a virus that infects the lungs, is an important cause of hospitalizations in infants and older adults. RSV rates tend to start increasing each year in the southeastern US in early autumn, with waves occurring later to the north and west over several months.
+### Influenza (Seasonal Flu)
 
-
-### Influenza
 Coming soon!
 
-### SARS-CoV-2
-Coming soon!
+### Covid-19
 
+Coming soon!
 :::
 
 ------------------------------------------------------------------------
 
-## Vaccination
+## Childhood immunization rates
 
 Vaccination of children across the US, by state and vaccine. These data come from the [National Immunization Survey](https://data.cdc.gov/Child-Vaccinations/Vaccination-Coverage-among-Young-Children-0-35-Mon/fhky-rtsk/about_data) The size of the circle is proportional to the number of children participating in the survey. Caution should be used when interpreting these survey data.
-
 
 ```{r vax_data}
 #| context: data
@@ -500,8 +527,9 @@ output$vax_urban_plot <- renderPlotly({
                text=paste0(Geography, "<br>", 
                            Vaccine_dose, "<br>",
                            vax_uptake, "%" ))) +
-    geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
-    scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
+    geom_jitter(aes( color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
+    #scale_size(range = c(2, 5), name="Uptake (%)")+
+    scale_color_viridis_c(option = "viridis", direction=-1) +
     labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
     theme_minimal() + 
     scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
@@ -522,8 +550,9 @@ output$vax_insurance_plot <- renderPlotly({
                text=paste0(Geography, "<br>", 
                            Vaccine_dose, "<br>",
                            vax_uptake, "%" ))) +
-    geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
-    scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
+    geom_jitter(aes( color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
+   # scale_size(range = c(2, 5), name="Uptake (%)")+
+    scale_color_viridis_c(option = "viridis", direction=-1) +
     labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
     theme_minimal() + 
     scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
@@ -545,8 +574,9 @@ plot_vax <- vax_age %>% mutate(vax_order=as.numeric(as.factor(Vaccine)), Vaccine
                          Vaccine_dose, "<br>",
                          'Age: ',age, "<br>", 
                          vax_uptake, "%" ))) +
-  geom_jitter(aes(size = samp_size_vax, color = vax_uptake), height = 0.25, width = 0, alpha = 0.7) + 
-  scale_size(range = c(2, 5), name="Uptake (%)")+ scale_color_viridis_c(option = "viridis") +
+  geom_jitter(aes( color = vax_uptake), height = 0.25, width = 0, alpha = 0.7) + 
+  #scale_size(range = c(2, 5), name="Uptake (%)")+ 
+    scale_color_viridis_c(option = "viridis", direction=-1) +
   labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
   theme_minimal() + 
   scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
@@ -595,8 +625,7 @@ Variation in vaccine uptake rates based on insurance status
 
 ## Pneumococcal disease in the United States
 
-Pneumococcus is an important bacterial pathogen that causes severe disease like meningitis, blood-stream infections, and pneumonia. It also is a major cause of ear infections in children. Vaccines (PCVs) have been in use in the USA since 2000, with a switch to a new PCV that covered more strains in 2010. The introduction of these vaccines has largely led to the elimination of vaccine-targeted serotypes and smaller increases in disease caused by other serotypes. Some vaccine-targeted serotypes have recently re-emerged (e.g., 19F) for reasons that are still not clear.
-
+*Pneumococcus is an important bacterial pathogen that causes severe disease like meningitis, blood-stream infections, and pneumonia. It also is a major cause of ear infections in children. Vaccines (PCVs) have been in use in the USA since 2000, with a switch to a new PCV that covered more strains in 2010. The introduction of these vaccines has largely led to the elimination of vaccine-targeted serotypes and smaller increases in disease caused by other serotypes. Some vaccine-targeted serotypes have recently re-emerged (e.g., 19F) for reasons that are still not clear.*
 
 ```{r pneumococcus_data}
 #| context: data
@@ -674,6 +703,7 @@ output$stGeographyPlot <- renderPlotly({
     ggtitle(input$select.st2)
 })
 ```
+
 ::: panel-tabset
 ### Trends in serotype frequency
 
@@ -1308,6 +1338,7 @@ output$opioid_bar_graph_2022 <- renderPlotly({
 
 
 ```
+
 ::: panel-tabset
 ### Trends in national healthcare incidents
 
@@ -1340,7 +1371,6 @@ CDC WONDER
 #| panel: fill
 waffle::iron(w1, w2, w3)
 ```
-
 :::
 
 ------------------------------------------------------------------------
@@ -1353,10 +1383,11 @@ Coming soon!
 
 ### Acknowledgements
 
-We thank all of the organizations and individuals who make their data available for health monitoring and research.
+We thank all of the organizations and individuals who make their data available for health monitoring and research. Epic data were obtained using the SlicerDicer tool in [Epic Cosmos.](https://www.epicresearch.org/about-us)
 
 Contributors include:
-Data wrangling, code, visualization: Shelby Golden, Howard Baik, Maurice Dalton, Deus Thindwa, Stephanie Perniciaro, Dan Weinberger 
+
+Data wrangling, code, visualization: Shelby Golden, Howard Baik, Maurice Dalton, Deus Thindwa, Stephanie Perniciaro, Dan Weinberger
 
 Project Leadership and Partners: Megan Ranney, Bhramar Mukherjee, Katelyn Jetelina, Ron Borzekowski, Anne Zink, and Dan Weinberger
 
