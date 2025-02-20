@@ -167,9 +167,6 @@ epic_ed_combo <- epic_ed_all %>%
     ED_epic_scale_covid= 100*pct_covid_ED_epic/max(pct_covid_ED_epic,na.rm=T),
     )
 
-
-
-
 # e1_all_ages <- readr::read_csv('./Data/CONFIDENTIAL/RSVICD10week_state.csv', skip=15, col_names=F) %>%
 #   rename(geography=X1) %>%
 #   tidyr::fill( geography, .direction = 'down') %>%
@@ -373,7 +370,7 @@ output$distPlotRSV_dwh <- renderPlotly({
   geom_line(aes(x=date, y=N_epic_3m,color='Epic'), lty=1) +  
         theme_minimal()+
     xlab('Date')+
-    ylab('RSV activity')+
+    ylab('RSV activity (scaled to 100)')+
     scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a', 'Epic'='#984ea3'  ))+
     ggtitle(input$state.select2)
   
@@ -455,6 +452,34 @@ output$distPlotRSV_epic_ED_age <- renderPlotly({
 })
 
 
+output$epicMapRSV <- renderPlotly({
+
+ map_data <- epic_ed_combo %>%
+      filter(date == input$selected_date & Level == '<1 Years') %>%
+      mutate(state = state.abb[match(geography, state.name)] ,
+             #Note, if >20%, cap at 20 for plotting!
+           pct_RSV_ED_epic= if_else(pct_RSV_ED_epic>20,20, pct_RSV_ED_epic)  ) %>%
+   filter(!is.na(state)) %>%
+   as.data.frame()
+
+ max.val <- max(epic_ed_combo$pct_RSV_ED_epic, na.rm=T)
+pal1 <- viridis_pal()(4)
+date.print <- input$selected_date
+
+p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "pct_RSV_ED_epic") +
+scale_fill_gradientn(
+    colors = pal1,
+    values = scales::rescale(c(0, 5, 10, 15, 20)),
+    limits = c(0, 20),
+    na.value = "#440154FF"
+  ) +
+  ggtitle(paste("RSV ED Visit Percentage <1 year olds on", date.print))
+
+ggplotly(p1)
+})
+
+
+
 ```
 
 ::: panel-tabset
@@ -519,7 +544,30 @@ plotlyOutput("distPlotRSV_hosp_age")
 
 The hospitalization data comes from the RSV-NET, a CDC-supported network of sites around the US that tracks hospitalizations from RSV, influenza, and COVID-19. Data are smoothed with a 3 week average for vizualization.
 
-#### Emergency Department Visits
+#### Map of ED visits (state)
+
+```{r}
+#| panel: toolbar
+
+sliderInput("selected_date", label=NULL, 
+                  min = min(epic_ed_combo$date), 
+                  max = max(epic_ed_combo$date),
+                  value = max(epic_ed_combo$date),
+                 step=7,
+                  timeFormat = "%Y-%m-%d",
+                  animate = animationOptions(interval = 1000, loop = TRUE, playButton = 'P',pauseButton = 'S'))
+    
+```
+
+```{r}
+#| panel: fill
+
+      plotlyOutput("epicMapRSV")
+
+```
+
+#### Map of ED visits (county)
+
 
 ```{r}
 #| panel: fill
@@ -545,6 +593,9 @@ print(p1)
 ```
 
 The maps shows the proportion of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
+
+
+
 
 #### Trends in Google searches
 
