@@ -17,6 +17,7 @@ server: shiny
 #| context: setup
 #| include: false
 
+#https://r-graph-gallery.com/183-choropleth-map-with-leaflet.html
 library(tidyverse)
 library(plotly)
 library(shiny)
@@ -31,6 +32,7 @@ library(viridisLite)
 library(tigris)
 library(usmap)
 library(cowplot)
+library(leaflet)
 library(viridis)
 library(sf)
 library(ggrepel)
