@@ -573,23 +573,59 @@ sliderInput("selected_date", label=NULL,
 #| panel: fill
 
 i=length(dates)-1
-d1 <- open_dataset('./Data/NSSP_detailed.parquet') %>%
-  filter(county!='All' & week_end==dates[i] ) %>%
-  mutate(
-    percent_visits_rsv=if_else(percent_visits_rsv>1,1,percent_visits_rsv) ,
-    
-    
-    percent_visits_combined=if_else(percent_visits_combined>10,10,percent_visits_combined) ) %>%
+
+d1_state <- open_dataset('./Data/NSSP_detailed.parquet') %>%
+  filter(county=='All'  ) %>%
+  rename(percent_visits_rsv_state =percent_visits_rsv ) %>%
+   # percent_visits_rsv_state=if_else(percent_visits_rsv>1,1,percent_visits_rsv) ) %>%
+  rename(state=geography) %>%
+  dplyr::select(state,week_end, percent_visits_rsv_state) %>%
   collect()
 
-p1 <- usmap::plot_usmap(regions='counties', data=d1,values='percent_visits_rsv' )   +
-  labs(title = paste0('RSV ED visits ', dates[i])) + 
-  theme(panel.background = element_rect(color = "white", fill = "white")) +
-  scale_fill_stepsn('RSV', breaks= seq(0,1, by=0.1), limits = c(0,1),
-                    colors=viridis_pal()(10),
-                    guide = guide_colorsteps(even.steps = FALSE))
+d1_all <- open_dataset('./Data/NSSP_detailed.parquet') %>%
+  filter(county!='All' ) %>%
+   collect() %>%
+    rename(state=geography) %>%
+  dplyr::select(state, county, fips, week_end, percent_visits_rsv) %>%
+  left_join(d1_state, by=c('week_end', 'state')) %>%
+  mutate(percent_visits_rsv = if_else(is.na(percent_visits_rsv),percent_visits_rsv_state,percent_visits_rsv ),
+  #fix CT county coding
+  fips = if_else(state=='Connecticut' & county=='Fairfield',9001 ,
+              if_else(state=='Connecticut' &  county=='Hartford', 9003,
+                 if_else(state=='Connecticut'& county=='Litchfield', 9005 ,
+                  if_else(state=='Connecticut' & county=='Middlesex',9007 ,
+                   if_else(state=='Connecticut' & county=='New Haven', 9009 ,
+                   if_else(state=='Connecticut' & county=='New London',9011 ,
+                   if_else(state=='Connecticut' & county=='Tolland',9013 ,
+                   if_else(state=='Connecticut' & county=='Windham', 9015, fips)))))))
+         ) ) %>%
+  as.data.frame()
 
-print(p1)
+   subtitle= 'National Syndromic Surveillance Program (CDC)'
+   scaletitle= 'Proportion'
+  
+pal1 <- viridis_pal()(4)
+    
+p1 <- d1_all %>%
+  filter(week_end==dates[i]) %>%
+         usmap::plot_usmap(regions='county', data=.,values='percent_visits_rsv',
+                        color = NA,    # Faint border color
+                        size = 0     )+      # Thin border lines)   +
+  theme(panel.background = element_rect(color = "white", fill = "white")) +
+ scale_fill_gradientn(
+   scaletitle,
+    colors = pal1,
+    values = scales::rescale(c(0, 0.33, 0.66, 0.99, max(d1$percent_visits_rsv))),
+    limits = c(0, max(d1$percent_visits_rsv)),
+    na.value = "darkgray"
+  )
+
+
+ggplotly(p1)%>%
+  layout(title = list(text = paste0(paste0('RSV ED visits by jurisdiction ', dates[i]),
+                                    '<br>',
+                                    '<sup>',
+                                     subtitle,'</sup>')))
 ```
 
 The maps shows the proportion of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
