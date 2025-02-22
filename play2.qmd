@@ -570,7 +570,6 @@ sliderInput("selected_date", label=NULL,
 
 #### Map of ED visits (county)
 
-
 ```{r}
 #| panel: fill
 
@@ -631,9 +630,6 @@ ggplotly(p1)%>%
 ```
 
 The maps shows the proportion of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
-
-
-
 
 #### Trends in Google searches
 
@@ -715,9 +711,7 @@ plotlyOutput("distPlotflu_epic_ED_age")
 
 ```
 
-
 ### Covid-19
-
 
 ```{r covid_plots}
 #| context: server
@@ -784,7 +778,6 @@ plotlyOutput("distPlotcovid_epic_ED_age")
 
 
 ```
-
 :::
 
 ------------------------------------------------------------------------
@@ -1728,4 +1721,4 @@ Data wrangling, code, visualization: Shelby Golden, Howard Baik, Maurice Dalton,
 
 Project Leadership and Partners: Megan Ranney, Bhramar Mukherjee, Katelyn Jetelina, Ron Borzekowski, Anne Zink, and Dan Weinberger
 
-Questions or suggestions? Contact daniel dot weinberger at yale dot edu
+Feedback or suggestions? [Let us know!](https://docs.google.com/forms/d/e/1FAIpQLSchAasiq7ovCCNz9ussb7C2ntkZ-8Rjc7-tNSglkf5boS-A0w/viewform?usp=dialog)
