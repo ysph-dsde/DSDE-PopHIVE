@@ -1210,9 +1210,7 @@ Variation in vaccine uptake rates based on insurance status
 
 ------------------------------------------------------------------------
 
-
 ## Youth Wellbeing
-
 
 ------------------------------------------------------------------------
 
@@ -1235,23 +1233,59 @@ s1 <- read.csv('./Data/youth_wellbeing/WISQARS/youth_self_harm.csv') %>%
 ### Self-harm
 
 ::: panel-tabset
-
-#### WISQARS
+#### National (WISQARS)
 
 ```{r}
 #| panel: fill
 
-ggplot(s1, aes(x=Year, y=Crude.Rate, group=Sex, color=Sex, linetype=Sex)) +
+p1 <- ggplot(s1, aes(x=Year, y=Crude.Rate, group=Sex, color=Sex, linetype=Sex)) +
   geom_line()+
   facet_wrap(~Age.Group) +
   theme_classic() +
   ylab('Events/100,000 people')+
   ggtitle('Self harm among youths (CDC/WISQARS)')
+ggplotly(p1)
 ```
+
+These data come from the [CDC WISQARS](https://wisqars.cdc.gov/) platform, which has data from the [National Electronic Injury Surveillance System-All Injury Program (NEISS-AIP)](https://wisqars.cdc.gov/about/nonfatal-injury-data/), a sample of emergency departments around the United States.
+
+#### State (Epic Cosmos)
+
+*Coming soon*
+
+```{r}
+#| panel: fill
+
+```
+:::
+
+### Road accidents
+
+*Coming soon!*
+
+::: panel-tabset
 
 #### Epic Cosmos
 
-*Coming soon*
+*Coming soon!*
+
+```{r}
+#| panel: fill
+
+```
+
+
+:::
+
+### Overdose attempts
+
+*Coming soon!*
+
+::: panel-tabset
+
+#### Epic Cosmos
+
+*Coming soon!*
 
 ```{r}
 #| panel: fill
@@ -1260,23 +1294,27 @@ ggplot(s1, aes(x=Year, y=Crude.Rate, group=Sex, color=Sex, linetype=Sex)) +
 
 :::
 
-### Injury
+### Obesity
+
+*Coming soon!*
 
 ::: panel-tabset
 
-*Coming soon*
-
 #### Epic Cosmos
 
+*Coming soon!*
 
 ```{r}
+#| panel: fill
 
 ```
 
-:::
+
 :::
 
-## Opioids 
+:::
+
+## Opioids
 
 ```{r opioid_data}
 #| context: data
