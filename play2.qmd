@@ -1055,7 +1055,7 @@ This shows trends in Invasive Pneumococcal Disease caused by different serotypes
 
 ### Change in Invasive pneumococcal Disease 1998-2022
 
-```{r}
+```{r pneumococcus_data_2}
 #| include: false
 
 pcv7 <- c('4','6B','9V','14','18C','19F','23F')
@@ -1181,7 +1181,7 @@ plotlyOutput("stGeographyPlot")
 
 ### Comparison of invasive pneumococcal disease and pneumonia
 
-```{r}
+```{r pneumococcus_data_3}
 ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
   rename(agec = "Age.Group..years.",
          year=Year,
@@ -1219,6 +1219,12 @@ Most often, pneumococcal disease is diagnosed by isolating the bacteria from blo
 #| include: false
 #| cache: true
 #| cache.extra: !expr file.info("data.csv")$mtime
+
+
+## NOTE: (Feb 28, 2025) Do not filter out the numerical codings (7777, 8888, and
+##       9999) from all numerical columns prior to plotting. Instead, only
+##       filter the column being plotted.
+
 
 # Interactive
 df1 <- read_csv('./Data/Harmonized Opioid Overdose Datasets_01.23.2025.csv', show_col_types = FALSE) |>
