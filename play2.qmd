@@ -160,9 +160,9 @@ epic_ed_combo <- epic_ed_all %>%
          pct_flu_ED_epic =N_flu_ED_epic/N_ED_epic*100,
          pct_covid_ED_epic =N_covid_ED_epic/N_ED_epic*100,
          
-         pct_RSV_ED_epic <- zoo::rollmean(pct_RSV_ED_epic, k = 3, fill = NA, align='right'),
-         pct_flu_ED_epic <- zoo::rollmean(pct_flu_ED_epic, k = 3, fill = NA, align='right'),
-         pct_covid_ED_epic <- zoo::rollmean(pct_covid_ED_epic, k = 3, fill = NA, align='right'),
+         pct_RSV_ED_epic = zoo::rollmean(pct_RSV_ED_epic, k = 3, fill = NA, align='right'),
+         pct_flu_ED_epic = zoo::rollmean(pct_flu_ED_epic, k = 3, fill = NA, align='right'),
+         pct_covid_ED_epic = zoo::rollmean(pct_covid_ED_epic, k = 3, fill = NA, align='right'),
          
     ED_epic_scale_RSV= 100*pct_RSV_ED_epic/max(pct_RSV_ED_epic,na.rm=T),
     ED_epic_scale_flu= 100*pct_flu_ED_epic/max(pct_flu_ED_epic,na.rm=T),
@@ -1378,7 +1378,7 @@ opioid_od <- read_csv(opioid_path) %>%
 
 
 # Waffle Plots
-subset <- read_csv("Data/Harmonized Opioid Overdose Datasets_02.05.2025.csv") |> 
+subset <- read_csv("Data/Harmonized Opioid Overdose Datasets_01.23.2025.csv") |> 
   # Filter the placeholder numerical values.
   #filter(`Age Adjusted Rate` %!in% 7777 & `Age Adjusted Rate` %!in% 8888 & `Age Adjusted Rate` %!in% 9999) %>%
   filter(Count %!in% 7777 & Count %!in% 8888 & Count %!in% 9999) %>%
