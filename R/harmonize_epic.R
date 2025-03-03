@@ -74,7 +74,9 @@ epic_ed_combo2 <- reshape2::dcast( epic_ed_combo, geography+Level+date + outcome
          race_strata='none',
          race_level=NA_character_,
          additional_strata1 = 'none',
-         additional_strata_level =NA_character_
+         additional_strata_level =NA_character_,
+         sex_strata='none',
+         sex_level= NA_character_
          
          )
 write_parquet(epic_ed_combo2, './Data/harmonized_epic_flu_rsv_covid.parquet')
