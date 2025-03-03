@@ -77,4 +77,4 @@ epic_ed_combo2 <- reshape2::dcast( epic_ed_combo, geography+Level+date + outcome
          additional_strata_level =NA_character_
          
          )
-write_parquet(epic_ed_combo2, './Data/CONFIDENTIAL/epic_flu_rsv_covid.parquet')
+write_parquet(epic_ed_combo2, './Data/harmonized_epic_flu_rsv_covid.parquet')
