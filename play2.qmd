@@ -1821,7 +1821,10 @@ Coming soon!
 
 ### Acknowledgements
 
-We thank all of the organizations and individuals who make their data available for health monitoring and research. Epic data were obtained using the SlicerDicer tool in [Epic Cosmos.](https://www.epicresearch.org/about-us)
+We thank all of the organizations and individuals who make their data available for health monitoring and research. 
+
+Some data used in this platform come from Epic Cosmos, a dataset created in collaboration with a community of Epic health systems representing more than 295 million patient records from over 1633 hospitals and 37,900 clinics from all 50 states, D.C.,
+Lebanon, and Saudi Arabia. Epic data were obtained using the SlicerDicer tool in [Epic Cosmos.](https://www.epicresearch.org/about-us)
 
 Contributors include:
 
