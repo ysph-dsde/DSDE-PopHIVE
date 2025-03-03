@@ -78,7 +78,7 @@ This platform is designed to give you timely, clear, and useful insights into co
 
 ------------------------------------------------------------------------
 
-## Respiratory viruses
+## Respiratory infections
 
 ::: panel-tabset
 ### Respiratory Syncytial Virus (RSV)
@@ -778,6 +778,263 @@ plotlyOutput("distPlotcovid_epic_ED_age")
 
 
 ```
+
+### Pneumococcus
+
+*Pneumococcus is an important bacterial pathogen that causes severe disease like meningitis, blood-stream infections, and pneumonia. It also is a major cause of ear infections in children. Vaccines (PCVs) have been in use in the USA since 2000, with a switch to a new PCV that covered more strains in 2010. The introduction of these vaccines has largely led to the elimination of vaccine-targeted serotypes and smaller increases in disease caused by other serotypes. Some vaccine-targeted serotypes have recently re-emerged (e.g., 19F) for reasons that are still not clear.*
+
+```{r pneumococcus_data}
+#| context: data
+#| include: false
+#| cache: true
+#| cache.extra: !expr file.info("data.csv")$mtime
+
+
+###Pneumococcal disease
+#csv_to_parquet('https://data.cdc.gov/resource/qvzb-qs6p.csv',path_to_parquet ='./Data/ipd_cdc1998.parquet')
+
+ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
+  rename(agec = "Age.Group..years.",
+         year=Year,
+         st=IPD.Serotype,
+         N_IPD = Frequency.Count) %>%
+  mutate( st= if_else(st=='16','16F', st),
+          agec1 = if_else(agec %in% c("Age <2","Age 2-4") ,1,2 ),
+          agec=gsub('Age ', '', agec),
+          agec2 = if_else( agec %in% c('<2','2-4'), '<5',
+                           if_else( agec %in% c('5-17','18-49'), '5-49',
+                                    if_else( agec %in% c('50-64','65+'), '50+',NA))),
+          agec2 = factor(agec2, levels=c('<5','5-49','50+'), labels=c('<5 years', '5-49 years', '50+ years') )
+  ) %>%
+  group_by(st,agec2, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup()
+
+all.sts <- unique(ipd1$st)
+
+
+# pneumococcal serotype by state
+b2019 <- read.csv('./Data/pneumococcus/jiac058_suppl_supplementary_table_s2.csv') %>%
+  group_by(State, sero) %>%
+  summarize(N_cases=n()) %>%
+  mutate(sero=as.factor(sero)) %>%
+  ungroup() %>%
+  group_by(State, sero) %>%
+  mutate(mean_cases=max(N_cases,na.rm=T)
+  ) %>%
+  group_by(State) %>%
+  mutate(         pct = N_cases/sum(N_cases, na.rm=T)*100) %>%
+  ungroup() %>%
+  tidyr::complete(sero,State , fill=list(pct=0))  #fills 0
+```
+
+```{r pneumococcus_plots}
+#| context: server 
+#Pneumococcal disease
+output$stPlot <- renderPlotly({
+  p1 <- ipd1  %>%
+    filter(st %in% c(input$select.st)) %>%
+    ggplot(aes(x=year, y=N_IPD))+
+    geom_line()+
+    facet_wrap(~agec2, scales ='free', nrow=1) +
+    theme_classic()+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1.0, hjust=1)) +
+    geom_vline(xintercept=c(1999.5, 2009.5), lty=2, color='gray')+
+    ylim(0,NA) +
+    ggtitle(paste0('Trends in IPD caused by serotype ', input$select.st, ' in the US'))
+  ggplotly(p1)
+})
+
+
+#serotype geography
+output$stGeographyPlot <- renderPlotly({
+  
+  b2019 %>%
+    filter(sero==input$select.st2 ) %>%
+    ggplot( aes(fill=State, y=pct, x=sero)) +
+    geom_bar(position="dodge", stat="identity")+
+    scale_fill_viridis_d()+
+    theme_minimal()+
+    ylab('Proportion of IPD cases in the state') +
+    ggtitle(input$select.st2)
+})
+```
+
+::: panel-tabset
+#### Trends in serotype frequency
+
+```{r}
+#| panel: toolbar
+selectInput("select.st",
+            "Select serotype:",
+            all.sts,
+            selected='19F')
+```
+
+```{r}
+#| panel: fill
+plotlyOutput("stPlot")
+
+```
+
+This shows trends in Invasive Pneumococcal Disease caused by different serotypes, as reported to the Active Bacterial Core Surevillance system (ABCs) at CDC. This is a network of 10 sites around the US.
+
+#### Change in Invasive pneumococcal Disease 1998-2022
+
+```{r pneumococcus_data_2}
+#| include: false
+
+pcv7 <- c('4','6B','9V','14','18C','19F','23F')
+
+pcv10gsk <- c(pcv7,'1','5','7F')
+
+pcv13 <- c(pcv7, '1','3','5','6A','7F','19A')
+
+s1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
+  rename(agec = "Age.Group..years.",
+         year=Year,
+         st=IPD.Serotype,
+         N_IPD = Frequency.Count) %>%
+  mutate( st= if_else(st=='16','16F', st)) %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup() %>%
+  group_by(st) %>%
+  mutate(cum_N= sum(N_IPD)) %>%
+  filter(cum_N>100) %>%
+  ungroup() %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT'))
+s2_pre<- s1 %>%
+  filter(year %in% c(1998, 1999)) %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup() %>%
+  group_by(st) %>%
+  summarize(N_IPD_pre=mean(N_IPD)) %>%
+  ungroup() %>%
+  tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
+
+s2_pre13<- s1 %>%
+  filter(year %in% c(2008, 2009)) %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup() %>%
+  group_by(st) %>%
+  summarize(N_IPD_pre=mean(N_IPD)) %>%
+  ungroup() %>%
+  tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
+
+s2<- s1 %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>% #sum across age group
+  ungroup() %>%
+  tidyr::complete(st, year, fill=list(N_IPD=0))%>%  #fills 0
+  left_join(s2_pre, by='st') %>%
+  mutate(N_IPD_pre = if_else(is.na(N_IPD_pre),0, N_IPD_pre) ,
+         logRR = log((N_IPD+1)/(N_IPD_pre+1) )) 
+
+max_RR <- s2 %>%
+  group_by(st) %>%
+  summarize(max_RR = max(logRR)) %>%
+  arrange((max_RR))
+
+s2$st <- factor(s2$st, levels = max_RR$st)
+
+df_wide <- s2 %>%
+  dplyr::select(year, st, logRR) %>%
+  tidyr::pivot_wider(names_from = year, values_from = logRR)
+
+
+df_vt <- df_wide %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='VT') %>%
+  dplyr::select(-pcv13st) 
+
+df_nvt <- df_wide %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='NVT') %>%
+  dplyr::select(-pcv13st) 
+
+rr_nvt <- s2 %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='NVT') %>%
+  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  labs(x = "Year", y =
+         "serotype", fill = "log RR") +
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+rr_vt <- s2 %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='VT') %>%
+  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
+  geom_tile() +
+  #     guides(fill="none")+
+  
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  labs(x = "Year", y =
+         "serotype", fill = "log RR") +
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+```{r}
+#| panel: fill
+subplot(ggplotly(rr_vt), ggplotly(rr_nvt),  margin = 0.04)
+```
+
+This shows the decreases in serotypes targeted by PCV13 (left) and increases in the occurrence of non-vaccine serotypes (right) since 1998/1999
+
+#### Geographic variation in serotype frequency
+
+Some serotypes have a similar distribution across the US, while others (e.g., serotype 4) have distinct geographic patterns. serotype 4 has been largely confined to the western US in recent years and is largely found among people who are homeless. Data from 2019 IPD (Beall et al, JID 2022 10.1093/infdis/jiac058)
+
+```{r}
+#| panel: toolbar
+selectInput("select.st2",
+            "Select serotype:",
+            unique(b2019$sero),
+            selected='19F')
+```
+
+```{r}
+#| panel: fill
+plotlyOutput("stGeographyPlot")
+
+```
+
+#### Comparison of invasive pneumococcal disease and pneumonia
+
+```{r pneumococcus_data_3}
+ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
+  rename(agec = "Age.Group..years.",
+         year=Year,
+         st=IPD.Serotype,
+         N_IPD = Frequency.Count) %>%
+  mutate( st= if_else(st=='16','16F', st),
+          st = if_else(st %in% c('15B','15C'), '15BC',st),
+          if_else(st %in% c('6A','6C'), '6AC',st)
+  ) %>%
+  filter(year %in% c(2019,2020) & agec %in% c('Age 50-64','Age 65+')) %>%
+  group_by(st) %>%
+  summarize( N_IPD= sum(N_IPD))
+
+uad <- readxl::read_excel('./Data/pneumococcus/SSUAD/ramirez_ofid_2025_ofae727.xlsx') %>%
+  mutate(N_SSUAD= over65 + a50_64_with_indication + a50_64_no_indication ) %>%
+  full_join(ipd1, by='st') %>%
+  filter(!is.na(N_SSUAD) & !is.na(N_IPD))
+
+ggplot(uad, aes(x=N_IPD, y=N_SSUAD, label=st)) +
+  geom_point()+
+  geom_text( vjust = 1)+
+  theme_classic() +
+  ggtitle('IPD vs pneumonia 50+ years in US')
+```
+
+Most often, pneumococcal disease is diagnosed by isolating the bacteria from blood or cerebrospinal fluid. It is harder to determine what serotypes cause pneumonia. This study from Louisville, Kentucky found that the serotypes that are the most common causes of severe blood stream infections are also the most common causes of pneumonia. pneumonia [Ramirez et al OFID 2025](https://academic.oup.com/ofid/article/12/1/ofae727/7926903)
+:::
 :::
 
 ------------------------------------------------------------------------
@@ -953,272 +1210,123 @@ Variation in vaccine uptake rates based on insurance status
 
 ------------------------------------------------------------------------
 
-## Pneumococcal disease in the United States
-
-*Pneumococcus is an important bacterial pathogen that causes severe disease like meningitis, blood-stream infections, and pneumonia. It also is a major cause of ear infections in children. Vaccines (PCVs) have been in use in the USA since 2000, with a switch to a new PCV that covered more strains in 2010. The introduction of these vaccines has largely led to the elimination of vaccine-targeted serotypes and smaller increases in disease caused by other serotypes. Some vaccine-targeted serotypes have recently re-emerged (e.g., 19F) for reasons that are still not clear.*
-
-```{r pneumococcus_data}
-#| context: data
-#| include: false
-#| cache: true
-#| cache.extra: !expr file.info("data.csv")$mtime
-
-
-###Pneumococcal disease
-#csv_to_parquet('https://data.cdc.gov/resource/qvzb-qs6p.csv',path_to_parquet ='./Data/ipd_cdc1998.parquet')
-
-ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
-  rename(agec = "Age.Group..years.",
-         year=Year,
-         st=IPD.Serotype,
-         N_IPD = Frequency.Count) %>%
-  mutate( st= if_else(st=='16','16F', st),
-          agec1 = if_else(agec %in% c("Age <2","Age 2-4") ,1,2 ),
-          agec=gsub('Age ', '', agec),
-          agec2 = if_else( agec %in% c('<2','2-4'), '<5',
-                           if_else( agec %in% c('5-17','18-49'), '5-49',
-                                    if_else( agec %in% c('50-64','65+'), '50+',NA))),
-          agec2 = factor(agec2, levels=c('<5','5-49','50+'), labels=c('<5 years', '5-49 years', '50+ years') )
-  ) %>%
-  group_by(st,agec2, year) %>%
-  summarize(N_IPD=sum(N_IPD)) %>%
-  ungroup()
-
-all.sts <- unique(ipd1$st)
-
-
-# pneumococcal serotype by state
-b2019 <- read.csv('./Data/pneumococcus/jiac058_suppl_supplementary_table_s2.csv') %>%
-  group_by(State, sero) %>%
-  summarize(N_cases=n()) %>%
-  mutate(sero=as.factor(sero)) %>%
-  ungroup() %>%
-  group_by(State, sero) %>%
-  mutate(mean_cases=max(N_cases,na.rm=T)
-  ) %>%
-  group_by(State) %>%
-  mutate(         pct = N_cases/sum(N_cases, na.rm=T)*100) %>%
-  ungroup() %>%
-  tidyr::complete(sero,State , fill=list(pct=0))  #fills 0
-```
-
-```{r pneumococcus_plots}
-#| context: server 
-#Pneumococcal disease
-output$stPlot <- renderPlotly({
-  p1 <- ipd1  %>%
-    filter(st %in% c(input$select.st)) %>%
-    ggplot(aes(x=year, y=N_IPD))+
-    geom_line()+
-    facet_wrap(~agec2, scales ='free', nrow=1) +
-    theme_classic()+
-    theme(axis.text.x = element_text(angle = 45, vjust = 1.0, hjust=1)) +
-    geom_vline(xintercept=c(1999.5, 2009.5), lty=2, color='gray')+
-    ylim(0,NA) +
-    ggtitle(paste0('Trends in IPD caused by serotype ', input$select.st, ' in the US'))
-  ggplotly(p1)
-})
-
-
-#serotype geography
-output$stGeographyPlot <- renderPlotly({
-  
-  b2019 %>%
-    filter(sero==input$select.st2 ) %>%
-    ggplot( aes(fill=State, y=pct, x=sero)) +
-    geom_bar(position="dodge", stat="identity")+
-    scale_fill_viridis_d()+
-    theme_minimal()+
-    ylab('Proportion of IPD cases in the state') +
-    ggtitle(input$select.st2)
-})
-```
-
-::: panel-tabset
-### Trends in serotype frequency
-
-```{r}
-#| panel: toolbar
-selectInput("select.st",
-            "Select serotype:",
-            all.sts,
-            selected='19F')
-```
-
-```{r}
-#| panel: fill
-plotlyOutput("stPlot")
-
-```
-
-This shows trends in Invasive Pneumococcal Disease caused by different serotypes, as reported to the Active Bacterial Core Surevillance system (ABCs) at CDC. This is a network of 10 sites around the US.
-
-### Change in Invasive pneumococcal Disease 1998-2022
-
-```{r}
-#| include: false
-
-pcv7 <- c('4','6B','9V','14','18C','19F','23F')
-
-pcv10gsk <- c(pcv7,'1','5','7F')
-
-pcv13 <- c(pcv7, '1','3','5','6A','7F','19A')
-
-s1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
-  rename(agec = "Age.Group..years.",
-         year=Year,
-         st=IPD.Serotype,
-         N_IPD = Frequency.Count) %>%
-  mutate( st= if_else(st=='16','16F', st)) %>%
-  group_by(st, year) %>%
-  summarize(N_IPD=sum(N_IPD)) %>%
-  ungroup() %>%
-  group_by(st) %>%
-  mutate(cum_N= sum(N_IPD)) %>%
-  filter(cum_N>100) %>%
-  ungroup() %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT'))
-s2_pre<- s1 %>%
-  filter(year %in% c(1998, 1999)) %>%
-  group_by(st, year) %>%
-  summarize(N_IPD=sum(N_IPD)) %>%
-  ungroup() %>%
-  group_by(st) %>%
-  summarize(N_IPD_pre=mean(N_IPD)) %>%
-  ungroup() %>%
-  tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
-
-s2_pre13<- s1 %>%
-  filter(year %in% c(2008, 2009)) %>%
-  group_by(st, year) %>%
-  summarize(N_IPD=sum(N_IPD)) %>%
-  ungroup() %>%
-  group_by(st) %>%
-  summarize(N_IPD_pre=mean(N_IPD)) %>%
-  ungroup() %>%
-  tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
-
-s2<- s1 %>%
-  group_by(st, year) %>%
-  summarize(N_IPD=sum(N_IPD)) %>% #sum across age group
-  ungroup() %>%
-  tidyr::complete(st, year, fill=list(N_IPD=0))%>%  #fills 0
-  left_join(s2_pre, by='st') %>%
-  mutate(N_IPD_pre = if_else(is.na(N_IPD_pre),0, N_IPD_pre) ,
-         logRR = log((N_IPD+1)/(N_IPD_pre+1) )) 
-
-max_RR <- s2 %>%
-  group_by(st) %>%
-  summarize(max_RR = max(logRR)) %>%
-  arrange((max_RR))
-
-s2$st <- factor(s2$st, levels = max_RR$st)
-
-df_wide <- s2 %>%
-  dplyr::select(year, st, logRR) %>%
-  tidyr::pivot_wider(names_from = year, values_from = logRR)
-
-
-df_vt <- df_wide %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
-  filter(pcv13st =='VT') %>%
-  dplyr::select(-pcv13st) 
-
-df_nvt <- df_wide %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
-  filter(pcv13st =='NVT') %>%
-  dplyr::select(-pcv13st) 
-
-rr_nvt <- s2 %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
-  filter(pcv13st =='NVT') %>%
-  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
-  geom_tile() +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
-  labs(x = "Year", y =
-         "serotype", fill = "log RR") +
-  theme_minimal()+
-  theme(axis.text.x=element_text(angle=45, hjust=1))
-
-rr_vt <- s2 %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
-  filter(pcv13st =='VT') %>%
-  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
-  geom_tile() +
-  #     guides(fill="none")+
-  
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
-  labs(x = "Year", y =
-         "serotype", fill = "log RR") +
-  theme_minimal()+
-  theme(axis.text.x=element_text(angle=45, hjust=1))
-```
-
-```{r}
-#| panel: fill
-subplot(ggplotly(rr_vt), ggplotly(rr_nvt),  margin = 0.04)
-```
-
-This shows the decreases in serotypes targeted by PCV13 (left) and increases in the occurrence of non-vaccine serotypes (right) since 1998/1999
-
-### Geographic variation in serotype frequency
-
-Some serotypes have a similar distribution across the US, while others (e.g., serotype 4) have distinct geographic patterns. serotype 4 has been largely confined to the western US in recent years and is largely found among people who are homeless. Data from 2019 IPD (Beall et al, JID 2022 10.1093/infdis/jiac058)
-
-```{r}
-#| panel: toolbar
-selectInput("select.st2",
-            "Select serotype:",
-            unique(b2019$sero),
-            selected='19F')
-```
-
-```{r}
-#| panel: fill
-plotlyOutput("stGeographyPlot")
-
-```
-
-### Comparison of invasive pneumococcal disease and pneumonia
-
-```{r}
-ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
-  rename(agec = "Age.Group..years.",
-         year=Year,
-         st=IPD.Serotype,
-         N_IPD = Frequency.Count) %>%
-  mutate( st= if_else(st=='16','16F', st),
-          st = if_else(st %in% c('15B','15C'), '15BC',st),
-          if_else(st %in% c('6A','6C'), '6AC',st)
-  ) %>%
-  filter(year %in% c(2019,2020) & agec %in% c('Age 50-64','Age 65+')) %>%
-  group_by(st) %>%
-  summarize( N_IPD= sum(N_IPD))
-
-uad <- readxl::read_excel('./Data/pneumococcus/SSUAD/ramirez_ofid_2025_ofae727.xlsx') %>%
-  mutate(N_SSUAD= over65 + a50_64_with_indication + a50_64_no_indication ) %>%
-  full_join(ipd1, by='st') %>%
-  filter(!is.na(N_SSUAD) & !is.na(N_IPD))
-
-ggplot(uad, aes(x=N_IPD, y=N_SSUAD, label=st)) +
-  geom_point()+
-  geom_text( vjust = 1)+
-  theme_classic() +
-  ggtitle('IPD vs pneumonia 50+ years in US')
-```
-
-Most often, pneumococcal disease is diagnosed by isolating the bacteria from blood or cerebrospinal fluid. It is harder to determine what serotypes cause pneumonia. This study from Louisville, Kentucky found that the serotypes that are the most common causes of severe blood stream infections are also the most common causes of pneumonia. pneumonia [Ramirez et al OFID 2025](https://academic.oup.com/ofid/article/12/1/ofae727/7926903)
-:::
+## Youth Wellbeing
 
 ------------------------------------------------------------------------
 
-## Opioids in the United States
+```{r youth_self_harm_data}
+#| context: data
+#| include: false
+
+#data from WISQARS dashboard; manual download 2/27/2025
+#Self-Harm All Causes Nonfatal Emergency Department Visits and Rates per 100,000 ;Data Years: 2001 to 2022, United States, 0 to 4 through 15 to 19, Males, Females, Disposition: All Cases
+
+s1 <- read.csv('./Data/youth_wellbeing/WISQARS/youth_self_harm.csv') %>%
+  filter(Intent=='Self-Harm' & Age.Group %in% c('10 to 14','15 to 19')) %>%
+  mutate(Crude.Rate=as.numeric(Crude.Rate))
+
+
+
+```
+
+::: panel-tabset
+### Self-harm
+
+::: panel-tabset
+#### National (WISQARS)
+
+```{r}
+#| panel: fill
+
+p1 <- ggplot(s1, aes(x=Year, y=Crude.Rate, group=Sex, color=Sex, linetype=Sex)) +
+  geom_line()+
+  facet_wrap(~Age.Group) +
+  theme_classic() +
+  ylab('Events/100,000 people')+
+  ggtitle('Self harm among youths (CDC/WISQARS)')
+ggplotly(p1)
+```
+
+These data come from the [CDC WISQARS](https://wisqars.cdc.gov/) platform, which has data from the [National Electronic Injury Surveillance System-All Injury Program (NEISS-AIP)](https://wisqars.cdc.gov/about/nonfatal-injury-data/), a sample of emergency departments around the United States.
+
+#### State (Epic Cosmos)
+
+*Coming soon*
+
+```{r}
+#| panel: fill
+
+```
+:::
+
+### Road accidents
+
+*Coming soon!*
+
+::: panel-tabset
+
+#### Epic Cosmos
+
+*Coming soon!*
+
+```{r}
+#| panel: fill
+
+```
+
+
+:::
+
+### Overdose attempts
+
+*Coming soon!*
+
+::: panel-tabset
+
+#### Epic Cosmos
+
+*Coming soon!*
+
+```{r}
+#| panel: fill
+
+```
+
+:::
+
+### Obesity
+
+*Coming soon!*
+
+::: panel-tabset
+
+#### Epic Cosmos
+
+*Coming soon!*
+
+```{r}
+#| panel: fill
+
+```
+
+
+:::
+
+:::
+
+## Opioids
 
 ```{r opioid_data}
 #| context: data
 #| include: false
 #| cache: true
 #| cache.extra: !expr file.info("data.csv")$mtime
+
+
+## NOTE: (Feb 28, 2025) Do not filter out the numerical codings (7777, 8888, and
+##       9999) from all numerical columns prior to plotting. Instead, only
+##       filter the column being plotted.
+
 
 # Interactive
 df1 <- read_csv('./Data/Harmonized Opioid Overdose Datasets_01.23.2025.csv', show_col_types = FALSE) |>
