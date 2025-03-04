@@ -17,7 +17,8 @@ cdc_nssp_ed1 <- runIfExpired('nssp_ed1',
 #Check that formatting is consistent between vintages. (1) check column names (2) check variable formats
 #compare newest data to previous dataset
 
-current_data = verify_update(  test_file = cdc_nssp_ed1, ds_path='./Data/nssp_ed1')
+current_data = verify_update(  test_file = cdc_nssp_ed1, ds_path='./Data/nssp_ed1') %>%
+  write_parquet('./Data/live_files/rsvnet_hosp.parquet')
 
 
 
