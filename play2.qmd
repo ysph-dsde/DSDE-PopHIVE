@@ -24,6 +24,7 @@ library(shiny)
 library(tidyverse)
 library(scales)
 library(janitor)
+library(gtrendsR)
 library(MMWRweek)
 library(arrow)
 #library(rnaturalearth)
@@ -188,6 +189,75 @@ epic_ed_combo <- epic_ed_all %>%
 
 ```
 
+
+```{r gtrends_data}
+#| context: data
+#| include: false
+
+# Define the GitHub raw URL
+url <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/data/term=rsv/part-0.parquet"
+
+# Download the file temporarily
+temp_file <- tempfile(fileext = ".parquet")
+download.file(url, temp_file, mode = "wb")
+
+g_states <- paste('US',state.abb,sep='-')
+# Read the Parquet file
+
+g1_state <- read_parquet(temp_file) %>%
+  filter(location %in% g_states) %>%
+  collect() %>%
+  mutate(date2=as.Date(date, '%b %d %Y'),
+         date = as.Date(ceiling_date(date2, 'week'))-1,
+         stateabb= gsub('US-','', location),
+         state=state.name[match(stateabb,state.abb)]) %>%
+  rename(search_volume=value) %>%
+  dplyr::select(state, date, search_volume)
+
+
+##Metro; Crosswalk the DMA to counties FIPS codes
+#https://www.kaggle.com/datasets/kapastor/google-trends-countydma-mapping?resource=download
+cw1 <- read.csv('./Data/GoogleTrends_CountyDMA_Mapping.csv') %>%
+  mutate(GOOGLE_DMA=toupper(GOOGLE_DMA))
+
+#Metro region
+#https://stackoverflow.com/questions/61213647/what-do-gtrendsr-statistical-areas-correlate-with
+#Nielsen DMA map: http://bl.ocks.org/simzou/6459889
+data("countries")
+
+metros <- countries[countries$country_code == 'US', ]
+
+metros <-
+  metros[grep("[[:digit:]]", substring(metros$sub_code, first = 4)), ]
+
+metros$numeric.sub.area <- gsub('US-', '', metros$sub_code)
+
+
+dma_link1 <- cbind.data.frame('DMA_name'=metros$name,'DMA'=metros$numeric.sub.area) %>%
+  rename(DMA_ID=DMA) %>%
+  full_join(cw1, by=c("DMA_name"="GOOGLE_DMA"))
+
+
+g1_metro <- read_parquet(temp_file) %>%
+  filter(!(location %in% g_states) ) %>%
+  collect() %>%
+  mutate(date2=as.Date(date, '%b %d %Y'),
+         date = as.Date(ceiling_date(date2, 'week'))-1) %>%
+  filter(date>='2021-03-01') %>%
+  rename(search_volume=value) %>%
+  left_join(dma_link1, by=c('location'='DMA_ID')) %>% #many to many join by date and counties
+   group_by(STATEFP,CNTYFP) %>%
+   mutate(fips=paste0(STATEFP,sprintf("%03d", CNTYFP)),
+          fips=as.numeric(fips),
+          
+          search_volume_scale = search_volume/max(search_volume,na.rm=T)*100) %>%
+   ungroup() 
+
+
+
+
+```
+
 ```{r rsv_data}
 #| context: data
 #| include: false
@@ -290,19 +360,21 @@ dwh <- d1 %>%
   full_join(w1, by=c('state','date')) %>%
   full_join(h1, by=c('state', 'date')) %>%
   left_join(e1_all_ages, by=c('state','date')) %>%
-  arrange(state, date) %>%
+  left_join(g1_state, by=c('state','date')) %>%
+    arrange(state, date) %>%
   group_by(state) %>%
   filter(date>='2023-07-01') %>%
   mutate(percent_visits_rsv_3m = zoo::rollmean(percent_visits_rsv, k = 3, fill = NA, align='right'),
         rsv_ww_3m = zoo::rollmean(rsv_ww, k = 3, fill = NA, align='right'),
         hosp_rate_3m = zoo::rollmean(hosp_rate, k = 3, fill = NA, align='right'),
         N_epic_3m = zoo::rollmean(N_epic, k = 3, fill = NA, align='right'),
+        google_3m = zoo::rollmean(search_volume, k = 3, fill = NA, align='right'),
     
     percent_visits_rsv_3m = percent_visits_rsv_3m / max(percent_visits_rsv_3m, na.rm=T)*100,
         rsv_ww_3m= rsv_ww_3m/max(rsv_ww_3m, na.rm=T)*100,
        hosp_rate_3m=hosp_rate_3m/max(hosp_rate_3m, na.rm=T)*100,
        N_epic_3m = N_epic_3m/max(N_epic_3m, na.rm=T)*100,
-       
+       google_3m =google_3m/max(google_3m, na.rm=T)*100
        
        
        
@@ -330,6 +402,8 @@ dwh <- cbind.data.frame(dwh,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
 #   collect() %>%
 #   as.data.frame()
 ```
+
+
 
 ```{r rsv_plots}
 #| context: server
@@ -370,10 +444,12 @@ output$distPlotRSV_dwh <- renderPlotly({
   geom_line(aes(x=date, y=rsv_ww_3m, color='WasteW')) +
   geom_line(aes(x=date, y=hosp_rate_3m,color='Hosp'), lty=2) +  
   geom_line(aes(x=date, y=N_epic_3m,color='Epic'), lty=1) +  
-        theme_minimal()+
+  geom_line(aes(x=date, y=google_3m,color='Google'), lty=1) +  
+
+            theme_minimal()+
     xlab('Date')+
     ylab('RSV activity (scaled to 100)')+
-    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a', 'Epic'='#984ea3'  ))+
+    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a', 'Epic'='#984ea3','Google'='#ff7f0070'  ))+
     ggtitle(input$state.select2)
   
   scale_colour_viridis_d() 
@@ -482,6 +558,33 @@ ggplotly(p1)
 
 
 
+output$googleMapRSV <- renderPlotly({
+
+ map_data <- g1_metro %>%
+   as.data.frame() %>%
+         filter(date == input$date.select2 ) 
+
+
+ max.val <- max(map_data$search_volume_scale, na.rm=T)
+pal1 <- viridis_pal()(4)
+date.print <- input$date.select2
+
+p1 <- usmap::plot_usmap(regions = "county", data = map_data, values = "search_volume_scale",
+                        color = NA,    # Faint border color
+                        size = 0     ) +
+scale_fill_gradientn(
+    colors = pal1,
+    values = scales::rescale(c(0, 20, 40, 60, 80,100)),
+    limits = c(0, 100),
+    na.value = "darkgray"
+  ) +
+    theme(panel.background = element_rect(color = "white", fill = "white")) +
+
+  ggtitle(paste("Google Search Volume for 'rsv' ending", date.print))
+
+ggplotly(p1)
+})
+
 ```
 
 ::: panel-tabset
@@ -554,7 +657,7 @@ The hospitalization data comes from the RSV-NET, a CDC-supported network of site
 sliderInput("selected_date", label=NULL, 
                   min = min(epic_ed_combo$date), 
                   max = max(epic_ed_combo$date),
-                  value = max(epic_ed_combo$date),
+                  value = as.Date('2024-10-19'),
                  step=7,
                   timeFormat = "%Y-%m-%d",
                   animate = animationOptions(interval = 1000, loop = TRUE, playButton = 'P',pauseButton = 'S'))
@@ -634,9 +737,22 @@ The maps shows the proportion of ED visits in each jurisdiction caused by RSV. S
 #### Trends in Google searches
 
 ```{r}
+#| panel: toolbar
+
+sliderInput("date.select2", label=NULL, 
+                  min = min(epic_ed_combo$date), 
+                  max = max(epic_ed_combo$date),
+                  value = as.Date('2024-10-19'),
+                 step=7,
+                  timeFormat = "%Y-%m-%d",
+                  animate = animationOptions(interval = 1000, loop = TRUE, playButton = 'P',pauseButton = 'S'))
+    
+```
+
+```{r}
 #| panel: fill
 
-print('Coming soon!')
+plotlyOutput('googleMapRSV')
 ```
 
 People searching for information on RSV often correlates well with actual clinical activity for RSV.
@@ -1828,7 +1944,7 @@ Lebanon, and Saudi Arabia. Epic data were obtained using the SlicerDicer tool in
 
 Contributors include:
 
-Data wrangling, code, visualization: Shelby Golden, Howard Baik, Maurice Dalton, Deus Thindwa, Stephanie Perniciaro, Dan Weinberger
+Data wrangling, code, visualization: Shelby Golden, Howard Baik,Micah Iserman, Maurice Dalton, Deus Thindwa, Stephanie Perniciaro, Dan Weinberger
 
 Project Leadership and Partners: Megan Ranney, Bhramar Mukherjee, Katelyn Jetelina, Ron Borzekowski, Anne Zink, and Dan Weinberger
 
