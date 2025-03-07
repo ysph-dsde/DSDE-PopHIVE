@@ -84,7 +84,7 @@ This platform is designed to give you timely, clear, and useful insights into co
 ::: panel-tabset
 ### Respiratory Syncytial Virus (RSV)
 
-*RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months.*
+*RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months. State-level ata typically represent certain regions or subsets of the population and do not necesarily represent disease spread in the entire state*
 
 ```{r epic_data}
 #| context: data
@@ -210,9 +210,12 @@ g1_state <- read_parquet(temp_file) %>%
   mutate(date2=as.Date(date, '%b %d %Y'),
          date = as.Date(ceiling_date(date2, 'week'))-1,
          stateabb= gsub('US-','', location),
-         state=state.name[match(stateabb,state.abb)]) %>%
+         state=state.name[match(stateabb,state.abb)],
+         value=round(value,2)) %>%
   rename(search_volume=value) %>%
-  dplyr::select(state, date, search_volume)
+  dplyr::select(state, date, search_volume) %>%
+  distinct() %>%
+  filter(date>='2014-01-01')
 
 
 ##Metro; Crosswalk the DMA to counties FIPS codes
@@ -359,8 +362,8 @@ d1 <- open_dataset('./Data/NSSP_detailed.parquet') %>%
 dwh <- d1 %>%
   full_join(w1, by=c('state','date')) %>%
   full_join(h1, by=c('state', 'date')) %>%
-  left_join(e1_all_ages, by=c('state','date')) %>%
-  left_join(g1_state, by=c('state','date')) %>%
+  full_join(e1_all_ages, by=c('state','date')) %>%
+  full_join(g1_state, by=c('state','date')) %>%
     arrange(state, date) %>%
   group_by(state) %>%
   filter(date>='2023-07-01') %>%
@@ -606,7 +609,7 @@ plotlyOutput("distPlotRSV_dwh")
 
 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 |------------------------------------------------------------------------|
-| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). |
+| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). The Google Trends data are obtained from the Google Health Trends API (volume of searches for 'rsv')   |
 
 #### Trends in positive tests
 
@@ -1941,7 +1944,9 @@ Coming soon!
 We thank all of the organizations and individuals who make their data available for health monitoring and research. 
 
 Some data used in this platform come from Epic Cosmos, a dataset created in collaboration with a community of Epic health systems representing more than 295 million patient records from over 1633 hospitals and 37,900 clinics from all 50 states, D.C.,
-Lebanon, and Saudi Arabia. Epic data were obtained using the SlicerDicer tool in [Epic Cosmos.](https://www.epicresearch.org/about-us)
+Lebanon, and Saudi Arabia. Epic data were obtained using the SlicerDicer tool in [Epic Cosmos.](https://www.epicresearch.org/about-us) and are presented here for non-commercial purposes.
+
+Google Trends data, representing search volume by week and state or metropolitan area, are obtained from the [Google Trends API](https://developers.google.com/terms/) for non-commercial purposes.
 
 Contributors include:
 
