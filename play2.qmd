@@ -734,25 +734,26 @@ ggplotly(p1)%>%
 
 The maps shows the proportion of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
 
-#### Trends in Google searches
+#### Maps of Google searches
+
+*Coming soon* 
 
 ```{r}
 #| panel: toolbar
 
-sliderInput("date.select2", label=NULL, 
-                  min = min(epic_ed_combo$date), 
-                  max = max(epic_ed_combo$date),
-                  value = as.Date('2024-10-19'),
-                 step=7,
-                  timeFormat = "%Y-%m-%d",
-                  animate = animationOptions(interval = 1000, loop = TRUE, playButton = 'P',pauseButton = 'S'))
+# sliderInput("date.select2", label=NULL, 
+#                   min = min(epic_ed_combo$date), 
+#                   max = max(epic_ed_combo$date),
+#                   value = as.Date('2024-10-19'),
+#                  step=7,
+#                   timeFormat = "%Y-%m-%d")
     
 ```
 
 ```{r}
 #| panel: fill
 
-plotlyOutput('googleMapRSV')
+#plotlyOutput('googleMapRSV')
 ```
 
 People searching for information on RSV often correlates well with actual clinical activity for RSV.
