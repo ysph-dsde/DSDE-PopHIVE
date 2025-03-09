@@ -709,7 +709,7 @@ d1_all <- open_dataset('./Data/NSSP_detailed.parquet') %>%
   as.data.frame()
 
    subtitle= 'National Syndromic Surveillance Program (CDC)'
-   scaletitle= 'Proportion'
+   scaletitle= 'Percent'
   
 pal1 <- viridis_pal()(4)
     
@@ -735,7 +735,7 @@ ggplotly(p1)%>%
                                      subtitle,'</sup>')))
 ```
 
-The maps shows the proportion of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
+The maps shows the percentage of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
 
 #### Maps of Google searches
 
