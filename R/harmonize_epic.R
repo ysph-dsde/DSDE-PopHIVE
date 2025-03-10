@@ -1,5 +1,7 @@
 
 
+library(tidyverse)
+source('./R/epic_age_import.R')
 
 #EPIC ED all cause
 epic_ed_all <-
