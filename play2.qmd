@@ -17,36 +17,40 @@ server: shiny
 #| context: setup
 #| include: false
 
+# Field "panel" has value toolbar, which must instead be one of: `tabset`, `input`, `sidebar`, `fill`, `center`
+
 #https://r-graph-gallery.com/183-choropleth-map-with-leaflet.html
-library(tidyverse)
-library(plotly)
-library(shiny)
-library(tidyverse)
-library(scales)
-library(janitor)
-library(MMWRweek)
-library(arrow)
-#library(rnaturalearth)
-library(parquetize)
-library(viridisLite)
-library(tigris)
-library(usmap)
-library(cowplot)
-library(leaflet)
-library(viridis)
-library(sf)
-library(ggrepel)
-library(readxl)
-library(ggalluvial)
-library(waffle)
-#library(cdcfluview)
-#install.packages("remotes")
-#remotes::install_github("hrbrmstr/cdcfluview")
-#hhs_regions$state <- state.abb[match(hhs_regions$state_or_territory,state.name)]
-#state.hhs.codes <- aggregate(hhs_regions$state, #list(hhs_regions$region), paste, collapse=",")
-#state.hhs.codes$x <- gsub('NA,','',state.hhs.codes$x)
-#state.hhs.codes$x <- gsub(',NA','',state.hhs.codes$x)
-#saveRDS(state.hhs.codes, './hhs_regions.rds')
+suppressPackageStartupMessages({
+  library(tidyverse)
+  library(plotly)
+  library(shiny)
+  library(tidyverse)
+  library(scales)
+  library(janitor)
+  library(MMWRweek)
+  library(arrow)
+  #library(rnaturalearth)
+  library(parquetize)
+  library(viridisLite)
+  library(tigris)
+  library(usmap)
+  library(cowplot)
+  library(leaflet)
+  library(viridis)
+  library(sf)
+  library(ggrepel)
+  library(readxl)
+  library(ggalluvial)
+  library(waffle)
+  #library(cdcfluview)
+  #install.packages("remotes")
+  #remotes::install_github("hrbrmstr/cdcfluview")
+  #hhs_regions$state <- state.abb[match(hhs_regions$state_or_territory,state.name)]
+  #state.hhs.codes <- aggregate(hhs_regions$state, #list(hhs_regions$region), paste, collapse=",")
+  #state.hhs.codes$x <- gsub('NA,','',state.hhs.codes$x)
+  #state.hhs.codes$x <- gsub(',NA','',state.hhs.codes$x)
+  #saveRDS(state.hhs.codes, './hhs_regions.rds')
+})
 
 yale_colors <- c(
   "#00356B",
@@ -90,7 +94,7 @@ This platform is designed to give you timely, clear, and useful insights into co
 #| include: false
 
 
-e1 <- readr::read_csv('./Data/CONFIDENTIAL/RSVICD10week_age_state.csv', skip=15, col_names=F) %>%
+e1 <- readr::read_csv('./Data/Epic Cosmos Data/RSVICD10week_age_state.csv', skip=15, col_names=F) %>%
   rename(geography=X1, age=X2) %>%
   tidyr::fill( geography, .direction = 'down') %>%
   reshape2::melt(., id.vars=c('geography','age')) %>%
@@ -488,7 +492,7 @@ ggplotly(p1)
 #### Overall Trends
 
 ```{r}
-#| panel: toolbar
+#| panel: tabset
 
 selectInput("state.select2", "State:", 
             choices=state.name, selected='New York')
@@ -508,7 +512,7 @@ plotlyOutput("distPlotRSV_dwh")
 #### Trends in positive tests
 
 ```{r}
-#| panel: toolbar
+#| panel: tabset
 
 selectInput("hhs.region.select", "Region:", 
             choices=unique(rsv_ts$hhs_abbr), selected='CT,ME,MA,NH,RI,VT')
@@ -525,7 +529,7 @@ These data come from the NREVSS surveillance system, which is comprised of labor
 #### By age
 
 ```{r}
-#| panel: toolbar
+#| panel: tabset
 
 selectInput("state.select3", "State:", 
             choices=state.name, selected='New York')
@@ -549,7 +553,7 @@ The hospitalization data comes from the RSV-NET, a CDC-supported network of site
 #### Map of ED visits (state)
 
 ```{r}
-#| panel: toolbar
+#| panel: tabset
 
 sliderInput("selected_date", label=NULL, 
                   min = min(epic_ed_combo$date), 
@@ -693,7 +697,7 @@ output$distPlotflu_epic_ED_age <- renderPlotly({
 #### By age
 
 ```{r}
-#| panel: toolbar
+#| panel: tabset
 
 selectInput("state.select4", "State:", 
             choices=state.name, selected='New York')
@@ -761,7 +765,7 @@ output$distPlotcovid_epic_ED_age <- renderPlotly({
 #### By age
 
 ```{r}
-#| panel: toolbar
+#| panel: tabset
 
 selectInput("state.select5", "State:", 
             choices=state.name, selected='New York')
@@ -864,7 +868,7 @@ output$stGeographyPlot <- renderPlotly({
 #### Trends in serotype frequency
 
 ```{r}
-#| panel: toolbar
+#| panel: tabset
 selectInput("select.st",
             "Select serotype:",
             all.sts,
@@ -992,7 +996,7 @@ This shows the decreases in serotypes targeted by PCV13 (left) and increases in 
 Some serotypes have a similar distribution across the US, while others (e.g., serotype 4) have distinct geographic patterns. serotype 4 has been largely confined to the western US in recent years and is largely found among people who are homeless. Data from 2019 IPD (Beall et al, JID 2022 10.1093/infdis/jiac058)
 
 ```{r}
-#| panel: toolbar
+#| panel: tabset
 selectInput("select.st2",
             "Select serotype:",
             unique(b2019$sero),
@@ -1177,7 +1181,7 @@ ggplotly(plot_vax, tooltip='text')
 Variation in vaccine uptake based on how urban an area is.
 
 ```{r}
-#| panel: toolbar
+#| panel: tabset
 
 selectInput("select.vax2", "Vaccine:", 
             choices=unique(vax_urban$Vaccine), selected='PCV')
