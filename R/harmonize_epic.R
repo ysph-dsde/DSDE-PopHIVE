@@ -80,3 +80,5 @@ epic_ed_combo2 <- reshape2::dcast( epic_ed_combo, geography+Level+date + outcome
          
          )
 write_parquet(epic_ed_combo2, './Data/harmonized_epic_flu_rsv_covid.parquet')
+
+#test <- read_parquet( './Data/harmonized_epic_flu_rsv_covid.parquet') %>% collect()
