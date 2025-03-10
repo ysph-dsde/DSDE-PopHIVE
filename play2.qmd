@@ -84,7 +84,7 @@ This platform is designed to give you timely, clear, and useful insights into co
 ::: panel-tabset
 ### Respiratory Syncytial Virus (RSV)
 
-*RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months. State-level ata typically represent certain regions or subsets of the population and do not necesarily represent disease spread in the entire state*
+*RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months. State-level data typically represent certain regions or subsets of the population and do not necessarily represent disease spread in the entire state*
 
 ```{r epic_data}
 #| context: data
@@ -131,6 +131,7 @@ e1_age <-  e1 %>% filter(age!='Total' & geography !='United States' & age != 'No
         ) %>%
   ungroup()
 
+write.csv(e1_age, './Data/plot_files/e1_age_epic_age_rsv.csv')
 
 
 #EPIC ED all cause
@@ -170,6 +171,9 @@ epic_ed_combo <- epic_ed_all %>%
     ED_epic_scale_covid= 100*pct_covid_ED_epic/max(pct_covid_ED_epic,na.rm=T),
     )
 
+
+write.csv(epic_ed_combo, './Data/plot_files/epic_ed_combo_rsv_flu_covid.csv')
+
 # e1_all_ages <- readr::read_csv('./Data/CONFIDENTIAL/RSVICD10week_state.csv', skip=15, col_names=F) %>%
 #   rename(geography=X1) %>%
 #   tidyr::fill( geography, .direction = 'down') %>%
@@ -194,67 +198,92 @@ epic_ed_combo <- epic_ed_all %>%
 #| context: data
 #| include: false
 
+
+#11j30ybfx6 = RSV vaccine
+url2 <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/data/term=%252Fg%252F11j30ybfx6/part-0.parquet" #rsv vaccination category
+
+temp_file2 <- tempfile(fileext = ".parquet")
+download.file(url2, temp_file2, mode = "wb")
+
+g1_vax_state <- read_parquet(temp_file2) %>%
+  filter(location %in% g_states) %>%
+  collect() %>%
+  mutate(date=as.Date(date),
+         date = as.Date(ceiling_date(date, 'week'))-1,
+         stateabb= gsub('US-','', location),
+         state=state.name[match(stateabb,state.abb)],
+         value=round(value,2)) %>%
+  rename(search_volume_vax=value) %>%
+  dplyr::select(state, date, search_volume_vax) %>%
+  distinct() %>%
+  filter(date>='2014-01-01')
+
+
 # Define the GitHub raw URL
-url <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/data/term=rsv/part-0.parquet"
+url1 <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/data/term=rsv/part-0.parquet"
+
 
 # Download the file temporarily
-temp_file <- tempfile(fileext = ".parquet")
-download.file(url, temp_file, mode = "wb")
+temp_file1 <- tempfile(fileext = ".parquet")
+download.file(url1, temp_file1, mode = "wb")
 
 g_states <- paste('US',state.abb,sep='-')
 # Read the Parquet file
 
-g1_state <- read_parquet(temp_file) %>%
+g1_state <- read_parquet(temp_file1) %>%
   filter(location %in% g_states) %>%
   collect() %>%
-  mutate(date2=as.Date(date, '%b %d %Y'),
-         date = as.Date(ceiling_date(date2, 'week'))-1,
+  mutate(date=as.Date(date),
+         date = as.Date(ceiling_date(date, 'week'))-1,
          stateabb= gsub('US-','', location),
          state=state.name[match(stateabb,state.abb)],
          value=round(value,2)) %>%
   rename(search_volume=value) %>%
   dplyr::select(state, date, search_volume) %>%
   distinct() %>%
-  filter(date>='2014-01-01')
-
+  filter(date>='2014-01-01') %>%
+  full_join(g1_vax_state, by=c('state', 'date') )
+  
 
 ##Metro; Crosswalk the DMA to counties FIPS codes
 #https://www.kaggle.com/datasets/kapastor/google-trends-countydma-mapping?resource=download
-cw1 <- read.csv('./Data/GoogleTrends_CountyDMA_Mapping.csv') %>%
-  mutate(GOOGLE_DMA=toupper(GOOGLE_DMA))
+# cw1 <- read.csv('./Data/GoogleTrends_CountyDMA_Mapping.csv') %>%
+#   mutate(GOOGLE_DMA=toupper(GOOGLE_DMA))
+# 
+# #Metro region
+# #https://stackoverflow.com/questions/61213647/what-do-gtrendsr-statistical-areas-correlate-with
+# #Nielsen DMA map: http://bl.ocks.org/simzou/6459889
+# data("countries")
+# 
+# metros <- countries[countries$country_code == 'US', ]
+# 
+# metros <-
+#   metros[grep("[[:digit:]]", substring(metros$sub_code, first = 4)), ]
+# 
+# metros$numeric.sub.area <- gsub('US-', '', metros$sub_code)
+# 
+# 
+# dma_link1 <- cbind.data.frame('DMA_name'=metros$name,'DMA'=metros$numeric.sub.area) %>%
+#   rename(DMA_ID=DMA) %>%
+#   full_join(cw1, by=c("DMA_name"="GOOGLE_DMA"))
+# 
 
-#Metro region
-#https://stackoverflow.com/questions/61213647/what-do-gtrendsr-statistical-areas-correlate-with
-#Nielsen DMA map: http://bl.ocks.org/simzou/6459889
-data("countries")
-
-metros <- countries[countries$country_code == 'US', ]
-
-metros <-
-  metros[grep("[[:digit:]]", substring(metros$sub_code, first = 4)), ]
-
-metros$numeric.sub.area <- gsub('US-', '', metros$sub_code)
 
 
-dma_link1 <- cbind.data.frame('DMA_name'=metros$name,'DMA'=metros$numeric.sub.area) %>%
-  rename(DMA_ID=DMA) %>%
-  full_join(cw1, by=c("DMA_name"="GOOGLE_DMA"))
-
-
-g1_metro <- read_parquet(temp_file) %>%
-  filter(!(location %in% g_states) ) %>%
-  collect() %>%
-  mutate(date2=as.Date(date, '%b %d %Y'),
-         date = as.Date(ceiling_date(date2, 'week'))-1) %>%
-  filter(date>='2021-03-01') %>%
-  rename(search_volume=value) %>%
-  left_join(dma_link1, by=c('location'='DMA_ID')) %>% #many to many join by date and counties
-   group_by(STATEFP,CNTYFP) %>%
-   mutate(fips=paste0(STATEFP,sprintf("%03d", CNTYFP)),
-          fips=as.numeric(fips),
-          
-          search_volume_scale = search_volume/max(search_volume,na.rm=T)*100) %>%
-   ungroup() 
+# g1_metro <- read_parquet(temp_file) %>%
+#   filter(!(location %in% g_states) ) %>%
+#   collect() %>%
+#   mutate(date2=as.Date(date, '%b %d %Y'),
+#          date = as.Date(ceiling_date(date2, 'week'))-1) %>%
+#   filter(date>='2021-03-01') %>%
+#   rename(search_volume=value) %>%
+#   left_join(dma_link1, by=c('location'='DMA_ID')) %>% #many to many join by date and counties
+#    group_by(STATEFP,CNTYFP) %>%
+#    mutate(fips=paste0(STATEFP,sprintf("%03d", CNTYFP)),
+#           fips=as.numeric(fips),
+#           
+#           search_volume_scale = search_volume/max(search_volume,na.rm=T)*100) %>%
+#    ungroup() 
 
 
 
@@ -298,6 +327,8 @@ rsv_ts <- cbind.data.frame(rsv_ts,dates2_rsv_ts[,c('MMWRyear', 'MMWRweek')]) %>%
           epiwk=epiwk-26
   )
 
+write.csv(rsv_ts,'./Data/plot_files/rsv_ts_nrevss_test_rsv.csv')
+
 #Detailed data, did a static download; updated regularly via API rdmq-nq56
 ##convert from CSV to parquet, which is much more compact!
 # csv_to_parquet(path_to_file = './Data/CopyOfNSSP_Emergency_Department_Visit_Trajectories_by_State_and_Sub_State_Regions-_COVID-19__Flu__RSV__Combined___20250130.csv', path_to_parquet ='./Data/NSSP_detailed.parquet') 
@@ -340,6 +371,10 @@ h1.age <- open_dataset('./Data/rsvnet_hosp.parquet') %>%
          scale_age=hosp_rate_3m/max(hosp_rate_3m, na.rm=T )*100,
          ) %>%
   as.data.frame()
+
+
+write.csv(h1.age,'./Data/plot_files/h1.age_rsv_hosp.csv')
+
 
 #Wastewaster by state and date
 w1 <- read.csv('./Data/RSVStateLevelDownloadCSV_ww.csv') %>%
@@ -395,6 +430,7 @@ dwh <- cbind.data.frame(dwh,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
           epiwk=epiwk-26
   )
 
+write.csv(dwh,'./Data/plot_files/dwh_combined_plot1.csv')
 
 #ED visits by demographics
 # d1 <- open_dataset('./Data/NSSP_demographics.parquet') %>%
@@ -561,32 +597,32 @@ ggplotly(p1)
 
 
 
-output$googleMapRSV <- renderPlotly({
-
- map_data <- g1_metro %>%
-   as.data.frame() %>%
-         filter(date == input$date.select2 ) 
-
-
- max.val <- max(map_data$search_volume_scale, na.rm=T)
-pal1 <- viridis_pal()(4)
-date.print <- input$date.select2
-
-p1 <- usmap::plot_usmap(regions = "county", data = map_data, values = "search_volume_scale",
-                        color = NA,    # Faint border color
-                        size = 0     ) +
-scale_fill_gradientn(
-    colors = pal1,
-    values = scales::rescale(c(0, 20, 40, 60, 80,100)),
-    limits = c(0, 100),
-    na.value = "darkgray"
-  ) +
-    theme(panel.background = element_rect(color = "white", fill = "white")) +
-
-  ggtitle(paste("Google Search Volume for 'rsv' ending", date.print))
-
-ggplotly(p1)
-})
+# output$googleMapRSV <- renderPlotly({
+# 
+#  map_data <- g1_metro %>%
+#    as.data.frame() %>%
+#          filter(date == input$date.select2 ) 
+# 
+# 
+#  max.val <- max(map_data$search_volume_scale, na.rm=T)
+# pal1 <- viridis_pal()(4)
+# date.print <- input$date.select2
+# 
+# p1 <- usmap::plot_usmap(regions = "county", data = map_data, values = "search_volume_scale",
+#                         color = NA,    # Faint border color
+#                         size = 0     ) +
+# scale_fill_gradientn(
+#     colors = pal1,
+#     values = scales::rescale(c(0, 20, 40, 60, 80,100)),
+#     limits = c(0, 100),
+#     na.value = "darkgray"
+#   ) +
+#     theme(panel.background = element_rect(color = "white", fill = "white")) +
+# 
+#   ggtitle(paste("Google Search Volume for 'rsv' ending", date.print))
+# 
+# ggplotly(p1)
+# })
 
 ```
 
