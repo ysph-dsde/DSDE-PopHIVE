@@ -17,7 +17,10 @@ server: shiny
 #| context: setup
 #| include: false
 
+# Field "panel" has value toolbar, which must instead be one of: `tabset`, `input`, `sidebar`, `fill`, `center`
+
 #https://r-graph-gallery.com/183-choropleth-map-with-leaflet.html
+suppressPackageStartupMessages({
 library(tidyverse)
 library(plotly)
 library(shiny)
@@ -40,6 +43,8 @@ library(ggrepel)
 library(readxl)
 library(ggalluvial)
 library(waffle)
+  
+})
 #library(cdcfluview)
 #install.packages("remotes")
 #remotes::install_github("hrbrmstr/cdcfluview")
@@ -91,7 +96,7 @@ This platform is designed to give you timely, clear, and useful insights into co
 #| include: false
 
 
-e1 <- readr::read_csv('./Data/CONFIDENTIAL/RSVICD10week_age_state.csv', skip=15, col_names=F) %>%
+e1 <- readr::read_csv('./Data/Epic Cosmos Data/RSVICD10week_age_state.csv', skip=15, col_names=F) %>%
   rename(geography=X1, age=X2) %>%
   tidyr::fill( geography, .direction = 'down') %>%
   reshape2::melt(., id.vars=c('geography','age')) %>%
@@ -174,7 +179,7 @@ epic_ed_combo <- epic_ed_all %>%
 
 write.csv(epic_ed_combo, './Data/plot_files/epic_ed_combo_rsv_flu_covid.csv')
 
-# e1_all_ages <- readr::read_csv('./Data/CONFIDENTIAL/RSVICD10week_state.csv', skip=15, col_names=F) %>%
+# e1_all_ages <- readr::read_csv('./Data/Epic Cosmos Data/RSVICD10week_state.csv', skip=15, col_names=F) %>%
 #   rename(geography=X1) %>%
 #   tidyr::fill( geography, .direction = 'down') %>%
 #   reshape2::melt(., id.vars=c('geography')) %>%
