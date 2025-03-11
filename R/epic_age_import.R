@@ -1,6 +1,6 @@
 epic_age_import <- function(ds_name, skipN=15) {
 
-  ds_out <- readr::read_csv(paste0("./Data/CONFIDENTIAL/",ds_name), skip=skipN, col_names=F) %>%
+  ds_out <- readr::read_csv(paste0("./Data/Epic Cosmos Data/",ds_name), skip=skipN, col_names=F) %>%
   rename(geography=X1, age=X2) %>%
   tidyr::fill( geography, .direction = 'down') %>%
   reshape2::melt(., id.vars=c('geography','age')) %>%
