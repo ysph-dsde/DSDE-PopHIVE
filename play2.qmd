@@ -21,7 +21,6 @@ server: shiny
 
 #https://r-graph-gallery.com/183-choropleth-map-with-leaflet.html
 suppressPackageStartupMessages({
-<<<<<<< HEAD
 library(tidyverse)
 library(plotly)
 library(shiny)
@@ -54,38 +53,6 @@ library(waffle)
 #state.hhs.codes$x <- gsub('NA,','',state.hhs.codes$x)
 #state.hhs.codes$x <- gsub(',NA','',state.hhs.codes$x)
 #saveRDS(state.hhs.codes, './hhs_regions.rds')
-=======
-  library(tidyverse)
-  library(plotly)
-  library(shiny)
-  library(tidyverse)
-  library(scales)
-  library(janitor)
-  library(MMWRweek)
-  library(arrow)
-  #library(rnaturalearth)
-  library(parquetize)
-  library(viridisLite)
-  library(tigris)
-  library(usmap)
-  library(cowplot)
-  library(leaflet)
-  library(viridis)
-  library(sf)
-  library(ggrepel)
-  library(readxl)
-  library(ggalluvial)
-  library(waffle)
-  #library(cdcfluview)
-  #install.packages("remotes")
-  #remotes::install_github("hrbrmstr/cdcfluview")
-  #hhs_regions$state <- state.abb[match(hhs_regions$state_or_territory,state.name)]
-  #state.hhs.codes <- aggregate(hhs_regions$state, #list(hhs_regions$region), paste, collapse=",")
-  #state.hhs.codes$x <- gsub('NA,','',state.hhs.codes$x)
-  #state.hhs.codes$x <- gsub(',NA','',state.hhs.codes$x)
-  #saveRDS(state.hhs.codes, './hhs_regions.rds')
-})
->>>>>>> aa78bab7d6bf48ca637dee2ca05e3dad1d3fe3b5
 
 yale_colors <- c(
   "#00356B",
@@ -122,7 +89,7 @@ This platform is designed to give you timely, clear, and useful insights into co
 ::: panel-tabset
 ### Respiratory Syncytial Virus (RSV)
 
-*RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months.*
+*RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months. State-level data typically represent certain regions or subsets of the population and do not necessarily represent disease spread in the entire state*
 
 ```{r epic_data}
 #| context: data
@@ -169,6 +136,7 @@ e1_age <-  e1 %>% filter(age!='Total' & geography !='United States' & age != 'No
         ) %>%
   ungroup()
 
+write.csv(e1_age, './Data/plot_files/e1_age_epic_age_rsv.csv')
 
 
 #EPIC ED all cause
@@ -208,14 +176,10 @@ epic_ed_combo <- epic_ed_all %>%
     ED_epic_scale_covid= 100*pct_covid_ED_epic/max(pct_covid_ED_epic,na.rm=T),
     )
 
-<<<<<<< HEAD
 
 write.csv(epic_ed_combo, './Data/plot_files/epic_ed_combo_rsv_flu_covid.csv')
 
 # e1_all_ages <- readr::read_csv('./Data/Epic Cosmos Data/RSVICD10week_state.csv', skip=15, col_names=F) %>%
-=======
-# e1_all_ages <- readr::read_csv('./Data/CONFIDENTIAL/RSVICD10week_state.csv', skip=15, col_names=F) %>%
->>>>>>> aa78bab7d6bf48ca637dee2ca05e3dad1d3fe3b5
 #   rename(geography=X1) %>%
 #   tidyr::fill( geography, .direction = 'down') %>%
 #   reshape2::melt(., id.vars=c('geography')) %>%
@@ -230,6 +194,103 @@ write.csv(epic_ed_combo, './Data/plot_files/epic_ed_combo_rsv_flu_covid.csv')
 #          geography= if_else(geography=='Total', 'United States', geography)) %>%
 #   dplyr::select(-variable) %>%
 #   rename(state=geography, N_epic=N_cases)
+
+
+```
+
+
+```{r gtrends_data}
+#| context: data
+#| include: false
+
+
+#11j30ybfx6 = RSV vaccine
+url2 <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/data/term=%252Fg%252F11j30ybfx6/part-0.parquet" #rsv vaccination category
+
+temp_file2 <- tempfile(fileext = ".parquet")
+download.file(url2, temp_file2, mode = "wb")
+
+g1_vax_state <- read_parquet(temp_file2) %>%
+  filter(location %in% g_states) %>%
+  collect() %>%
+  mutate(date=as.Date(date),
+         date = as.Date(ceiling_date(date, 'week'))-1,
+         stateabb= gsub('US-','', location),
+         state=state.name[match(stateabb,state.abb)],
+         value=round(value,2)) %>%
+  rename(search_volume_vax=value) %>%
+  dplyr::select(state, date, search_volume_vax) %>%
+  distinct() %>%
+  filter(date>='2014-01-01')
+
+
+# Define the GitHub raw URL
+url1 <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/data/term=rsv/part-0.parquet"
+
+
+# Download the file temporarily
+temp_file1 <- tempfile(fileext = ".parquet")
+download.file(url1, temp_file1, mode = "wb")
+
+g_states <- paste('US',state.abb,sep='-')
+# Read the Parquet file
+
+g1_state <- read_parquet(temp_file1) %>%
+  filter(location %in% g_states) %>%
+  collect() %>%
+  mutate(date=as.Date(date),
+         date = as.Date(ceiling_date(date, 'week'))-1,
+         stateabb= gsub('US-','', location),
+         state=state.name[match(stateabb,state.abb)],
+         value=round(value,2)) %>%
+  rename(search_volume=value) %>%
+  dplyr::select(state, date, search_volume) %>%
+  distinct() %>%
+  filter(date>='2014-01-01') %>%
+  full_join(g1_vax_state, by=c('state', 'date') )
+  
+
+##Metro; Crosswalk the DMA to counties FIPS codes
+#https://www.kaggle.com/datasets/kapastor/google-trends-countydma-mapping?resource=download
+# cw1 <- read.csv('./Data/GoogleTrends_CountyDMA_Mapping.csv') %>%
+#   mutate(GOOGLE_DMA=toupper(GOOGLE_DMA))
+# 
+# #Metro region
+# #https://stackoverflow.com/questions/61213647/what-do-gtrendsr-statistical-areas-correlate-with
+# #Nielsen DMA map: http://bl.ocks.org/simzou/6459889
+# data("countries")
+# 
+# metros <- countries[countries$country_code == 'US', ]
+# 
+# metros <-
+#   metros[grep("[[:digit:]]", substring(metros$sub_code, first = 4)), ]
+# 
+# metros$numeric.sub.area <- gsub('US-', '', metros$sub_code)
+# 
+# 
+# dma_link1 <- cbind.data.frame('DMA_name'=metros$name,'DMA'=metros$numeric.sub.area) %>%
+#   rename(DMA_ID=DMA) %>%
+#   full_join(cw1, by=c("DMA_name"="GOOGLE_DMA"))
+# 
+
+
+
+# g1_metro <- read_parquet(temp_file) %>%
+#   filter(!(location %in% g_states) ) %>%
+#   collect() %>%
+#   mutate(date2=as.Date(date, '%b %d %Y'),
+#          date = as.Date(ceiling_date(date2, 'week'))-1) %>%
+#   filter(date>='2021-03-01') %>%
+#   rename(search_volume=value) %>%
+#   left_join(dma_link1, by=c('location'='DMA_ID')) %>% #many to many join by date and counties
+#    group_by(STATEFP,CNTYFP) %>%
+#    mutate(fips=paste0(STATEFP,sprintf("%03d", CNTYFP)),
+#           fips=as.numeric(fips),
+#           
+#           search_volume_scale = search_volume/max(search_volume,na.rm=T)*100) %>%
+#    ungroup() 
+
+
 
 
 ```
@@ -270,6 +331,8 @@ rsv_ts <- cbind.data.frame(rsv_ts,dates2_rsv_ts[,c('MMWRyear', 'MMWRweek')]) %>%
           epiwk  = if_else( MMWRweek<=26, MMWRweek+52, MMWRweek  ),
           epiwk=epiwk-26
   )
+
+write.csv(rsv_ts,'./Data/plot_files/rsv_ts_nrevss_test_rsv.csv')
 
 #Detailed data, did a static download; updated regularly via API rdmq-nq56
 ##convert from CSV to parquet, which is much more compact!
@@ -314,6 +377,10 @@ h1.age <- open_dataset('./Data/rsvnet_hosp.parquet') %>%
          ) %>%
   as.data.frame()
 
+
+write.csv(h1.age,'./Data/plot_files/h1.age_rsv_hosp.csv')
+
+
 #Wastewaster by state and date
 w1 <- read.csv('./Data/RSVStateLevelDownloadCSV_ww.csv') %>%
   mutate(date=as.Date(Week_Ending_Date, '%m/%d/%Y')) %>%
@@ -335,20 +402,22 @@ d1 <- open_dataset('./Data/NSSP_detailed.parquet') %>%
 dwh <- d1 %>%
   full_join(w1, by=c('state','date')) %>%
   full_join(h1, by=c('state', 'date')) %>%
-  left_join(e1_all_ages, by=c('state','date')) %>%
-  arrange(state, date) %>%
+  full_join(e1_all_ages, by=c('state','date')) %>%
+  full_join(g1_state, by=c('state','date')) %>%
+    arrange(state, date) %>%
   group_by(state) %>%
   filter(date>='2023-07-01') %>%
   mutate(percent_visits_rsv_3m = zoo::rollmean(percent_visits_rsv, k = 3, fill = NA, align='right'),
         rsv_ww_3m = zoo::rollmean(rsv_ww, k = 3, fill = NA, align='right'),
         hosp_rate_3m = zoo::rollmean(hosp_rate, k = 3, fill = NA, align='right'),
         N_epic_3m = zoo::rollmean(N_epic, k = 3, fill = NA, align='right'),
+        google_3m = zoo::rollmean(search_volume, k = 3, fill = NA, align='right'),
     
     percent_visits_rsv_3m = percent_visits_rsv_3m / max(percent_visits_rsv_3m, na.rm=T)*100,
         rsv_ww_3m= rsv_ww_3m/max(rsv_ww_3m, na.rm=T)*100,
        hosp_rate_3m=hosp_rate_3m/max(hosp_rate_3m, na.rm=T)*100,
        N_epic_3m = N_epic_3m/max(N_epic_3m, na.rm=T)*100,
-       
+       google_3m =google_3m/max(google_3m, na.rm=T)*100
        
        
        
@@ -366,6 +435,7 @@ dwh <- cbind.data.frame(dwh,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
           epiwk=epiwk-26
   )
 
+write.csv(dwh,'./Data/plot_files/dwh_combined_plot1.csv')
 
 #ED visits by demographics
 # d1 <- open_dataset('./Data/NSSP_demographics.parquet') %>%
@@ -376,6 +446,8 @@ dwh <- cbind.data.frame(dwh,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
 #   collect() %>%
 #   as.data.frame()
 ```
+
+
 
 ```{r rsv_plots}
 #| context: server
@@ -416,10 +488,12 @@ output$distPlotRSV_dwh <- renderPlotly({
   geom_line(aes(x=date, y=rsv_ww_3m, color='WasteW')) +
   geom_line(aes(x=date, y=hosp_rate_3m,color='Hosp'), lty=2) +  
   geom_line(aes(x=date, y=N_epic_3m,color='Epic'), lty=1) +  
-        theme_minimal()+
+  geom_line(aes(x=date, y=google_3m,color='Google'), lty=1) +  
+
+            theme_minimal()+
     xlab('Date')+
     ylab('RSV activity (scaled to 100)')+
-    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a', 'Epic'='#984ea3'  ))+
+    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a', 'Epic'='#984ea3','Google'='#ff7f0070'  ))+
     ggtitle(input$state.select2)
   
   scale_colour_viridis_d() 
@@ -528,13 +602,40 @@ ggplotly(p1)
 
 
 
+# output$googleMapRSV <- renderPlotly({
+# 
+#  map_data <- g1_metro %>%
+#    as.data.frame() %>%
+#          filter(date == input$date.select2 ) 
+# 
+# 
+#  max.val <- max(map_data$search_volume_scale, na.rm=T)
+# pal1 <- viridis_pal()(4)
+# date.print <- input$date.select2
+# 
+# p1 <- usmap::plot_usmap(regions = "county", data = map_data, values = "search_volume_scale",
+#                         color = NA,    # Faint border color
+#                         size = 0     ) +
+# scale_fill_gradientn(
+#     colors = pal1,
+#     values = scales::rescale(c(0, 20, 40, 60, 80,100)),
+#     limits = c(0, 100),
+#     na.value = "darkgray"
+#   ) +
+#     theme(panel.background = element_rect(color = "white", fill = "white")) +
+# 
+#   ggtitle(paste("Google Search Volume for 'rsv' ending", date.print))
+# 
+# ggplotly(p1)
+# })
+
 ```
 
 ::: panel-tabset
 #### Overall Trends
 
 ```{r}
-#| panel: tabset
+#| panel: toolbar
 
 selectInput("state.select2", "State:", 
             choices=state.name, selected='New York')
@@ -549,12 +650,12 @@ plotlyOutput("distPlotRSV_dwh")
 
 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 |------------------------------------------------------------------------|
-| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). |
+| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). The Google Trends data are obtained from the Google Health Trends API (volume of searches for 'rsv')   |
 
 #### Trends in positive tests
 
 ```{r}
-#| panel: tabset
+#| panel: toolbar
 
 selectInput("hhs.region.select", "Region:", 
             choices=unique(rsv_ts$hhs_abbr), selected='CT,ME,MA,NH,RI,VT')
@@ -571,7 +672,7 @@ These data come from the NREVSS surveillance system, which is comprised of labor
 #### By age
 
 ```{r}
-#| panel: tabset
+#| panel: toolbar
 
 selectInput("state.select3", "State:", 
             choices=state.name, selected='New York')
@@ -595,12 +696,12 @@ The hospitalization data comes from the RSV-NET, a CDC-supported network of site
 #### Map of ED visits (state)
 
 ```{r}
-#| panel: tabset
+#| panel: toolbar
 
 sliderInput("selected_date", label=NULL, 
                   min = min(epic_ed_combo$date), 
                   max = max(epic_ed_combo$date),
-                  value = max(epic_ed_combo$date),
+                  value = as.Date('2024-10-19'),
                  step=7,
                   timeFormat = "%Y-%m-%d",
                   animate = animationOptions(interval = 1000, loop = TRUE, playButton = 'P',pauseButton = 'S'))
@@ -649,7 +750,7 @@ d1_all <- open_dataset('./Data/NSSP_detailed.parquet') %>%
   as.data.frame()
 
    subtitle= 'National Syndromic Surveillance Program (CDC)'
-   scaletitle= 'Proportion'
+   scaletitle= 'Percent'
   
 pal1 <- viridis_pal()(4)
     
@@ -675,14 +776,28 @@ ggplotly(p1)%>%
                                      subtitle,'</sup>')))
 ```
 
-The maps shows the proportion of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
+The maps shows the percentage of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
 
-#### Trends in Google searches
+#### Maps of Google searches
+
+*Coming soon* 
+
+```{r}
+#| panel: toolbar
+
+# sliderInput("date.select2", label=NULL, 
+#                   min = min(epic_ed_combo$date), 
+#                   max = max(epic_ed_combo$date),
+#                   value = as.Date('2024-10-19'),
+#                  step=7,
+#                   timeFormat = "%Y-%m-%d")
+    
+```
 
 ```{r}
 #| panel: fill
 
-print('Coming soon!')
+#plotlyOutput('googleMapRSV')
 ```
 
 People searching for information on RSV often correlates well with actual clinical activity for RSV.
@@ -739,7 +854,7 @@ output$distPlotflu_epic_ED_age <- renderPlotly({
 #### By age
 
 ```{r}
-#| panel: tabset
+#| panel: toolbar
 
 selectInput("state.select4", "State:", 
             choices=state.name, selected='New York')
@@ -807,7 +922,7 @@ output$distPlotcovid_epic_ED_age <- renderPlotly({
 #### By age
 
 ```{r}
-#| panel: tabset
+#| panel: toolbar
 
 selectInput("state.select5", "State:", 
             choices=state.name, selected='New York')
@@ -910,7 +1025,7 @@ output$stGeographyPlot <- renderPlotly({
 #### Trends in serotype frequency
 
 ```{r}
-#| panel: tabset
+#| panel: toolbar
 selectInput("select.st",
             "Select serotype:",
             all.sts,
@@ -1038,7 +1153,7 @@ This shows the decreases in serotypes targeted by PCV13 (left) and increases in 
 Some serotypes have a similar distribution across the US, while others (e.g., serotype 4) have distinct geographic patterns. serotype 4 has been largely confined to the western US in recent years and is largely found among people who are homeless. Data from 2019 IPD (Beall et al, JID 2022 10.1093/infdis/jiac058)
 
 ```{r}
-#| panel: tabset
+#| panel: toolbar
 selectInput("select.st2",
             "Select serotype:",
             unique(b2019$sero),
@@ -1223,7 +1338,7 @@ ggplotly(plot_vax, tooltip='text')
 Variation in vaccine uptake based on how urban an area is.
 
 ```{r}
-#| panel: tabset
+#| panel: toolbar
 
 selectInput("select.vax2", "Vaccine:", 
             choices=unique(vax_urban$Vaccine), selected='PCV')
@@ -1870,11 +1985,13 @@ Coming soon!
 We thank all of the organizations and individuals who make their data available for health monitoring and research. 
 
 Some data used in this platform come from Epic Cosmos, a dataset created in collaboration with a community of Epic health systems representing more than 295 million patient records from over 1633 hospitals and 37,900 clinics from all 50 states, D.C.,
-Lebanon, and Saudi Arabia. Epic data were obtained using the SlicerDicer tool in [Epic Cosmos.](https://www.epicresearch.org/about-us)
+Lebanon, and Saudi Arabia. Epic data were obtained using the SlicerDicer tool in [Epic Cosmos.](https://www.epicresearch.org/about-us) and are presented here for non-commercial purposes.
+
+Google Trends data, representing search volume by week and state or metropolitan area, are obtained from the [Google Trends API](https://developers.google.com/terms/) for non-commercial purposes.
 
 Contributors include:
 
-Data wrangling, code, visualization: Shelby Golden, Howard Baik, Maurice Dalton, Deus Thindwa, Stephanie Perniciaro, Dan Weinberger
+Data wrangling, code, visualization: Shelby Golden, Howard Baik,Micah Iserman, Maurice Dalton, Deus Thindwa, Stephanie Perniciaro, Dan Weinberger
 
 Project Leadership and Partners: Megan Ranney, Bhramar Mukherjee, Katelyn Jetelina, Ron Borzekowski, Anne Zink, and Dan Weinberger
 
