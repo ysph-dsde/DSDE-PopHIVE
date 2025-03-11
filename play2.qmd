@@ -203,6 +203,8 @@ write.csv(epic_ed_combo, './Data/plot_files/epic_ed_combo_rsv_flu_covid.csv')
 #| context: data
 #| include: false
 
+g_states <- paste('US',state.abb,sep='-')
+# Read the Parquet file
 
 #11j30ybfx6 = RSV vaccine
 url2 <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/data/term=%252Fg%252F11j30ybfx6/part-0.parquet" #rsv vaccination category
@@ -232,8 +234,7 @@ url1 <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/da
 temp_file1 <- tempfile(fileext = ".parquet")
 download.file(url1, temp_file1, mode = "wb")
 
-g_states <- paste('US',state.abb,sep='-')
-# Read the Parquet file
+
 
 g1_state <- read_parquet(temp_file1) %>%
   filter(location %in% g_states) %>%
@@ -247,8 +248,34 @@ g1_state <- read_parquet(temp_file1) %>%
   dplyr::select(state, date, search_volume) %>%
   distinct() %>%
   filter(date>='2014-01-01') %>%
-  full_join(g1_vax_state, by=c('state', 'date') )
+  full_join(g1_vax_state, by=c('state', 'date') ) %>%
+  mutate(month=month(date),
+        season = if_else(month>=7 & month <=10,1,0),
+        rsv_novax = search_volume - search_volume_vax ,
+         rsv_novax2 = search_volume - season*(4.41-1.69)*search_volume_vax - (1-season)*3.41*search_volume_vax,  #2.655 based on the regression below
+        rsv_novax2 = if_else(rsv_novax2<0,0,rsv_novax2)
+        )
   
+
+# g1_state %>%
+#   filter(state=='New York' & date>='2023-07-01') %>%
+#   ggplot(aes(x=date, y=search_volume)) +
+#     geom_line()+
+#     geom_line(aes(x=date, y=search_volume_vax), col='red') +
+#   geom_line(aes(x=date, y=rsv_novax2), col='blue') + 
+#   geom_line(aes(x=date, y=search_volume_vax), col='green')  
+
+# g1_state %>%
+#   filter(state=='New York' & date>='2023-07-01') %>%
+#   mutate(month=as.factor(month(date)) )%>%
+# ggplot(aes(x=search_volume_vax, y=search_volume, color=month)) +
+#     geom_point()
+
+# 
+ mod1 <- lme4::lmer(search_volume~ 1 + season*search_volume_vax +  (1|state), data=g1_state[g1_state$date>=as.Date('2023-07-01'),])
+# coef.vax <- summary(mod1)$coefficients['search_volume_vax','Estimate']
+
+
 
 ##Metro; Crosswalk the DMA to counties FIPS codes
 #https://www.kaggle.com/datasets/kapastor/google-trends-countydma-mapping?resource=download
@@ -411,18 +438,27 @@ dwh <- d1 %>%
         rsv_ww_3m = zoo::rollmean(rsv_ww, k = 3, fill = NA, align='right'),
         hosp_rate_3m = zoo::rollmean(hosp_rate, k = 3, fill = NA, align='right'),
         N_epic_3m = zoo::rollmean(N_epic, k = 3, fill = NA, align='right'),
-        google_3m = zoo::rollmean(search_volume, k = 3, fill = NA, align='right'),
+        google_3m_a = zoo::rollmean(search_volume, k = 3, fill = NA, align='right'),
+        google_3m_b = zoo::rollmean(rsv_novax, k = 3, fill = NA, align='right'),
+        google_3m_c = zoo::rollmean(rsv_novax2, k = 3, fill = NA, align='right'),
     
-    percent_visits_rsv_3m = percent_visits_rsv_3m / max(percent_visits_rsv_3m, na.rm=T)*100,
-        rsv_ww_3m= rsv_ww_3m/max(rsv_ww_3m, na.rm=T)*100,
+       percent_visits_rsv_3m = percent_visits_rsv_3m / max(percent_visits_rsv_3m, na.rm=T)*100,
+      rsv_ww_3m= rsv_ww_3m/max(rsv_ww_3m, na.rm=T)*100,
        hosp_rate_3m=hosp_rate_3m/max(hosp_rate_3m, na.rm=T)*100,
        N_epic_3m = N_epic_3m/max(N_epic_3m, na.rm=T)*100,
-       google_3m =google_3m/max(google_3m, na.rm=T)*100
-       
-       
-       
-       
+       google_3m_a =google_3m_a/max(google_3m_a, na.rm=T)*100,
+       google_3m_b =google_3m_b/max(google_3m_b, na.rm=T)*100,
+       google_3m_c =google_3m_c/max(google_3m_c, na.rm=T)*100,
        )
+
+# dwh %>%
+#   filter(state=='New York' & date>='2023-07-01') %>%
+#   ggplot(aes(x=date, y=google_3m_b)) +
+#     geom_line()+
+#     geom_line(aes(x=date, y=google_3m_a), col='red') +
+#   geom_line(aes(x=date, y=google_3m_c), col='blue') +
+#   geom_line(aes(x=date, y=N_epic_3m), col='blue', linewidth=2) 
+
 
 dates2 <- MMWRweek(as.Date(dwh$date))
 
@@ -488,12 +524,13 @@ output$distPlotRSV_dwh <- renderPlotly({
   geom_line(aes(x=date, y=rsv_ww_3m, color='WasteW')) +
   geom_line(aes(x=date, y=hosp_rate_3m,color='Hosp'), lty=2) +  
   geom_line(aes(x=date, y=N_epic_3m,color='Epic'), lty=1) +  
-  geom_line(aes(x=date, y=google_3m,color='Google'), lty=1) +  
+  geom_line(aes(x=date, y=google_3m_b,color='Google'), lty=1) +  
+  geom_line(aes(x=date, y=google_3m_c,color='Google (adj)'), lty=1) +  
 
             theme_minimal()+
     xlab('Date')+
     ylab('RSV activity (scaled to 100)')+
-    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a', 'Epic'='#984ea3','Google'='#ff7f0070'  ))+
+    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a', 'Epic'='#984ea3','Google'='#ff7f0070' ,'Google (adj)'='#a65628' ))+
     ggtitle(input$state.select2)
   
   scale_colour_viridis_d() 
@@ -650,7 +687,7 @@ plotlyOutput("distPlotRSV_dwh")
 
 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 |------------------------------------------------------------------------|
-| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). The Google Trends data are obtained from the Google Health Trends API (volume of searches for 'rsv')   |
+| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). The Google Trends data are obtained from the Google Health Trends API (volume of searches for 'rsv', subtracting volume of searches for category "respiratory syncytial virus vaccine" (Knowledge graph: /g/11j30ybfx6) )   |
 
 #### Trends in positive tests
 
