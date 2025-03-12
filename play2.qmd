@@ -749,11 +749,17 @@ d1_all <- open_dataset('./Data/NSSP_detailed.parquet') %>%
          ) ) %>%
   as.data.frame()
 
-   subtitle= 'National Syndromic Surveillance Program (CDC)'
-   scaletitle= 'Percent'
+
+write.csv(d1_state, './Data/plot_files/NSSP_detailed_states.csv')
+write.csv(d1_all, './Data/plot_files/NSSP_detailed_counties.csv')
+
+
+
+subtitle= 'National Syndromic Surveillance Program (CDC)'
+scaletitle= 'Percent'
   
 pal1 <- viridis_pal()(4)
-    
+
 p1 <- d1_all %>%
   filter(week_end==dates[i]) %>%
          usmap::plot_usmap(regions='county', data=.,values='percent_visits_rsv',
@@ -967,7 +973,7 @@ ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
                                     if_else( agec %in% c('50-64','65+'), '50+',NA))),
           agec2 = factor(agec2, levels=c('<5','5-49','50+'), labels=c('<5 years', '5-49 years', '50+ years') )
   ) %>%
-  group_by(st,agec2, year) %>%
+  group_by(st, agec2, year) %>%
   summarize(N_IPD=sum(N_IPD)) %>%
   ungroup()
 
@@ -978,15 +984,17 @@ all.sts <- unique(ipd1$st)
 b2019 <- read.csv('./Data/pneumococcus/jiac058_suppl_supplementary_table_s2.csv') %>%
   group_by(State, sero) %>%
   summarize(N_cases=n()) %>%
-  mutate(sero=as.factor(sero)) %>%
+  mutate(sero=as.factor(sero), mean_cases=max(N_cases,na.rm=T)) %>%
   ungroup() %>%
-  group_by(State, sero) %>%
-  mutate(mean_cases=max(N_cases,na.rm=T)
-  ) %>%
   group_by(State) %>%
-  mutate(         pct = N_cases/sum(N_cases, na.rm=T)*100) %>%
+  mutate(pct = N_cases/sum(N_cases, na.rm=T)*100) %>%
   ungroup() %>%
   tidyr::complete(sero,State , fill=list(pct=0))  #fills 0
+
+
+write.csv(ipd1, './Data/plot_files/pneumococcus_ABCs_st_1998_2021.csv')
+write.csv(b2019, './Data/plot_files/pneumococcus_serotype_by_state.csv')
+
 ```
 
 ```{r pneumococcus_plots}
@@ -1065,7 +1073,8 @@ s1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
   filter(cum_N>100) %>%
   ungroup() %>%
   mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT'))
-s2_pre<- s1 %>%
+
+s2_pre <- s1 %>%
   filter(year %in% c(1998, 1999)) %>%
   group_by(st, year) %>%
   summarize(N_IPD=sum(N_IPD)) %>%
@@ -1085,7 +1094,11 @@ s2_pre13<- s1 %>%
   ungroup() %>%
   tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
 
-s2<- s1 %>%
+## s2_pre13 differs from s2_pre in the years filtered. s2_pre13 is not
+## used, but it looks like s2_pre is.
+
+
+s2 <- s1 %>%
   group_by(st, year) %>%
   summarize(N_IPD=sum(N_IPD)) %>% #sum across age group
   ungroup() %>%
@@ -1101,10 +1114,11 @@ max_RR <- s2 %>%
 
 s2$st <- factor(s2$st, levels = max_RR$st)
 
+
+
 df_wide <- s2 %>%
   dplyr::select(year, st, logRR) %>%
   tidyr::pivot_wider(names_from = year, values_from = logRR)
-
 
 df_vt <- df_wide %>%
   mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
@@ -1116,34 +1130,54 @@ df_nvt <- df_wide %>%
   filter(pcv13st =='NVT') %>%
   dplyr::select(-pcv13st) 
 
-rr_nvt <- s2 %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
-  filter(pcv13st =='NVT') %>%
-  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
-  geom_tile() +
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
-  labs(x = "Year", y =
-         "serotype", fill = "log RR") +
-  theme_minimal()+
-  theme(axis.text.x=element_text(angle=45, hjust=1))
+## df_vt and df_nvt do not appear to be used.
 
-rr_vt <- s2 %>%
-  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
-  filter(pcv13st =='VT') %>%
-  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
-  geom_tile() +
-  #     guides(fill="none")+
-  
-  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
-  labs(x = "Year", y =
-         "serotype", fill = "log RR") +
-  theme_minimal()+
-  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+write.csv(s2, './Data/plot_files/changes_pneumococcal_infections_ABCs_st_1998_2021.csv')
+
+
 ```
 
 ```{r}
 #| panel: fill
+
+rr_nvt <- s2 %>%
+  mutate(pcv13st = if_else(st %in% pcv13, 'VT', 'NVT')) %>%
+  filter(pcv13st == 'NVT') %>%
+  ggplot(aes(x = factor(year), y = st, fill = logRR)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "blue",
+    mid = "white",
+    high = "red",
+    midpoint = 0
+  ) +
+  labs(x = "Year", y =
+         "serotype", fill = "log RR") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+rr_vt <- s2 %>%
+  mutate(pcv13st = if_else(st %in% pcv13, 'VT', 'NVT')) %>%
+  filter(pcv13st == 'VT') %>%
+  ggplot(aes(x = factor(year), y = st, fill = logRR)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "blue",
+    mid = "white",
+    high = "red",
+    midpoint = 0
+  ) +
+  labs(x = "Year", y =
+         "serotype", fill = "log RR") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
 subplot(ggplotly(rr_vt), ggplotly(rr_nvt),  margin = 0.04)
+
+
 ```
 
 This shows the decreases in serotypes targeted by PCV13 (left) and increases in the occurrence of non-vaccine serotypes (right) since 1998/1999
@@ -1169,7 +1203,8 @@ plotlyOutput("stGeographyPlot")
 #### Comparison of invasive pneumococcal disease and pneumonia
 
 ```{r pneumococcus_data_3}
-ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
+
+ipd2 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
   rename(agec = "Age.Group..years.",
          year=Year,
          st=IPD.Serotype,
@@ -1184,14 +1219,20 @@ ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
 
 uad <- readxl::read_excel('./Data/pneumococcus/SSUAD/ramirez_ofid_2025_ofae727.xlsx') %>%
   mutate(N_SSUAD= over65 + a50_64_with_indication + a50_64_no_indication ) %>%
-  full_join(ipd1, by='st') %>%
+  full_join(ipd2, by='st') %>%
   filter(!is.na(N_SSUAD) & !is.na(N_IPD))
+
+
+write.csv(uad, './Data/plot_files/ramirez_ofid_joined_IPD.csv')
+
 
 ggplot(uad, aes(x=N_IPD, y=N_SSUAD, label=st)) +
   geom_point()+
+  #geom_text(position = position_jitter(width = 2, height = 2)) +
   geom_text( vjust = 1)+
   theme_classic() +
   ggtitle('IPD vs pneumonia 50+ years in US')
+
 ```
 
 Most often, pneumococcal disease is diagnosed by isolating the bacteria from blood or cerebrospinal fluid. It is harder to determine what serotypes cause pneumonia. This study from Louisville, Kentucky found that the serotypes that are the most common causes of severe blood stream infections are also the most common causes of pneumonia. pneumonia [Ramirez et al OFID 2025](https://academic.oup.com/ofid/article/12/1/ofae727/7926903)
@@ -1258,6 +1299,11 @@ vax_insurance <- open_dataset('./Data/vax/peds_vax.parquet') %>%
                (Vaccine=='PCV' & Dose =='≥4 Doses') 
             ) ) %>%
   mutate(insurance= factor(insurance, levels= c("Uninsured", "Any Medicaid","Private Insurance Only","Other"),labels=c('Uninsured','Medicaid', 'Private','Other') ))
+
+
+write.csv(vax_age, './Data/plot_files/ramirez_ofid_joined_IPD.csv')
+write.csv(vax_urban, './Data/plot_files/ramirez_ofid_joined_IPD.csv')
+write.csv(vax_insurance, './Data/plot_files/ramirez_ofid_joined_IPD.csv')
 
 
 
