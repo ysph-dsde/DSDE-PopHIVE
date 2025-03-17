@@ -1111,40 +1111,11 @@ These data come from the [CDC WISQARS](https://wisqars.cdc.gov/) platform, which
 ##       filter the column being plotted. Filtering all columns at once removes
 ##       a lot of viable values that could be plotted.
 
+summarized_opioid_df <- read_csv("./Data/plot_files/summarized_opioid_df.csv", show_col_types = FALSE)
 
-# Import and modify the dates representation.
-opioid_df <- read_csv("./Data/Opioid_Overdoses.csv", show_col_types = FALSE) |>
-  clean_names() |>
-  #filter(!(count %in% c(7777, 8888, 9999))) |> 
-  #filter(!(crude_rate %in% c(7777, 8888, 9999))) |> 
-  #filter(!(age_adjusted_rate %in% c(7777, 8888, 9999))) |> 
-  mutate(qtr = as.numeric((gsub("Q", '', quarter))),
-         # NOTE: Quarter = NA represent entries that are for the entire year.
-         qtr = if_else(is.na(qtr), 1, qtr),
-         qdate = year + qtr / 4 - 1 / 4,
-         year_quarter = paste(year, quarter)) |> 
-  as.data.frame()
-
-
-# Time series dataset
-opioid_time_series <- opioid_df |>
-  # Keep only the counts. Filter out the numeric placeholder values.
-  filter(!(count %in% c(7777, 8888, 9999))) |> 
-  # Filter out rows without Quarter
-  filter(!is.na(quarter)) |> 
-  filter(drug == 'All Opioids' & characteristic == 'Age') |>
-  group_by(dataset, state, year_quarter, level) %>%
-  summarize(count = sum(count, na.rm = TRUE)) |>
-  ungroup() |>
-  pivot_wider(names_from = level, values_from = count) |>
-  mutate(Overall = `25-44 Years` + `45-64 Years` + `65+ Years` + `<24 Years`) |>
-  pivot_longer(cols = where(is.numeric),
-               names_to = "level",
-               values_to = "count") |>
-  mutate(level = factor(level), 
-         level = fct_relevel(level, c("Overall", "65+ Years", "45-64 Years", 
-                                      "25-44 Years", "<24 Years") )) |>
-  filter(count > 0)
+waffle_df  <- read_csv("./Data/plot_files/opioid_waffle.csv", show_col_types = FALSE)
+wonder_map <- read_csv("./Data/plot_files/opioid_ahrq_map.csv", show_col_types = FALSE)
+ahrq_map   <- read_csv("./Data/plot_files/opioid_wonder_map.csv", show_col_types = FALSE)
   
   
 ```
@@ -1161,46 +1132,6 @@ opioid_time_series <- opioid_df |>
 ########################################
 ## Waffle Plots
 ########################################
-
-waffle_df <- opioid_df |> 
-  # Filter the placeholder numerical values.
-  filter(!(count %in% c(7777, 8888, 9999))) |> 
-  #filter(!(crude_rate %in% c(7777, 8888, 9999))) |> 
-  #filter(!(age_adjusted_rate %in% c(7777, 8888, 9999))) |>
-  
-  # Removing the extraneous Drug and Year classes that are not common to the
-  # SUDORS and CDC WONDER dataset.
-  filter(drug %!in% c("Naloxone"), year %in% c(2020, 2021, 2022)) %>%
-  
-  # Filter the metadata settings.
-  filter(state %in% "US", quarter %in% NA, setting %in% "All",
-         underlying_cause_of_death %in% "Unintentional",
-         characteristic %in% "Not Stratified", level %in% "N/A") %>%
-  
-  # Some random duplicates were detected. Not sure where these might have
-  # been introduced or if the dataset came this way. This script is meant to
-  # quickly deal with these.
-  group_by(dataset, year, drug) %>%
-  mutate(Count = sum(count)) %>%
-  ungroup() %>%
-  
-  select(-crude_rate, -age_adjusted_rate, -population) %>%
-  distinct() %>%
-  
-  # Calculate the relative proportion of overdose events for a given Dataset
-  # and Year.
-  group_by(dataset, year) %>%
-  mutate(percentage = floor(count/sum(count)*100)) %>%
-  ungroup() %>%
-  
-  # Waffle plots do not accept NA's or 0's. Remove them.
-  mutate_at(c("percentage"), ~replace_na(., 0)) %>%
-  filter(!percentage == 0) %>%
-  
-  # Organize the final table.
-  .[with(., order(dataset, year, percentage)), ] %>% `rownames<-`(NULL) %>%
-  as.data.frame()
-
 
 # Color palette
 saturated   <- c('#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99', '#e31a1c',
@@ -1274,25 +1205,9 @@ w3 <- waffle_2022 %>%
 # Generate a side-by-side set of plots showing "drug = All Opioids" counts
 # by state in 2022. Toggle the setting to show either inpatient or ER.
 
-
-# Counts in AHRQ dataset.
-ahrq_map_plot <- opioid_df %>%
-  # Filter the placeholder numerical values.
-  filter(!(count %in% c(7777, 8888, 9999))) |> 
-  #filter(!(crude_rate %in% c(7777, 8888, 9999))) |> 
-  #filter(!(age_adjusted_rate %in% c(7777, 8888, 9999))) |>
   
-  # Switch between the two settings, and change the subtitle name.
-  filter(setting %in% "Medical Facility - Inpatient") %>%
-  #filter(setting %in% "Medical Facility - Outpatient or ER") %>%
-  
-  # Filter the metadata settings.
-  filter(dataset %in% "AHRQ", state %in% datasets::state.name, 
-         year %in% 2022, quarter %in% NA,
-         underlying_cause_of_death %in% "All", drug %in% "All Opioids",
-         characteristic %in% "Not Stratified", level %in% "N/A") %>%
-  
-  # Plot settings and features.
+# Plot settings and features.
+ahrq_map_plot <- ahrq_map %>%
   plot_usmap(data = ., values = "count", color = "#00356B",) + 
   scale_fill_gradientn(
     # Use Yale branding colors in gradient
@@ -1309,32 +1224,14 @@ ahrq_map_plot <- opioid_df %>%
         axis.text = element_blank(),
         # Adjust legend text
         legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14))
-  
-# Add a custom tooltip with comma formatting
-ahrq_map_plot <- ahrq_map_plot +
+        legend.title = element_text(size = 14)) +
+  # Add a custom tooltip with comma formatting
   aes(text = paste0("State: ", state, "<br>",
                     "Count: ", scales::comma(count)))
   
-
-# Counts in CDC WONDER dataset.
-wonder_map_plot <- opioid_df %>%
-  # Filter the placeholder numerical values.
-  filter(!(count %in% c(7777, 8888, 9999))) |> 
-  #filter(!(crude_rate %in% c(7777, 8888, 9999))) |> 
-  #filter(!(age_adjusted_rate %in% c(7777, 8888, 9999))) |>
   
-  # Switch between the two settings, and change the subtitle name.
-  filter(setting %in% "Medical Facility - Inpatient") %>%
-  #filter(setting %in% "Medical Facility - Outpatient or ER") %>%
-  
-  # Filter the metadata settings.
-  filter(dataset %in% "CDC WONDER", state %in% datasets::state.name, 
-         year %in% 2022, quarter %in% NA,
-         underlying_cause_of_death %in% "All", drug %in% "All Opioids",
-         characteristic %in% "Not Stratified", level %in% "N/A") %>%
-  
-  # Plot settings and features.
+# Plot settings and features.
+wonder_map_plot <- wonder_map %>%
   plot_usmap(data = ., values = "count", color = "#00356B",) + 
   scale_fill_gradientn(
     # Use Yale branding colors in gradient
@@ -1351,12 +1248,10 @@ wonder_map_plot <- opioid_df %>%
         axis.text = element_blank(),
         # Adjust legend text
         legend.text = element_text(size = 12),
-        legend.title = element_text(size = 14))
-
-# Add a custom tooltip with comma formatting
-wonder_map_plot <- wonder_map_plot +
-  aes(text = paste0("State: ", state, "<br>",
-                    "Count: ", scales::comma(count)))
+        legend.title = element_text(size = 14)) +
+  # Add a custom tooltip with comma formatting
+    aes(text = paste0("State: ", state, "<br>",
+                      "Count: ", scales::comma(count)))
 
 
 ```
@@ -1367,12 +1262,8 @@ wonder_map_plot <- wonder_map_plot +
 #| context: server
 
 output$distPlot1 <- renderPlotly({
-  p1 <- opioid_df %>%
-    dplyr::filter(drug == 'All Opioids' & characteristic == 'Age' &
-                  dataset == 'AHRQ' & state == input$state.select) %>%
-    # Combine outpatient nad inpatient
-    group_by(qdate, level) %>%
-    summarize(count = sum(count)) %>%
+  p1 <- summarized_opioid_df %>%
+    dplyr::filter(dataset == 'AHRQ' & state == input$state.select) %>%
     ggplot(aes(x = qdate, y = count, group = level, color = level)) +
       theme_minimal() +
       geom_line()
@@ -1384,12 +1275,8 @@ output$distPlot1 <- renderPlotly({
 
 # (March 12th, 2025) Currently we do not have a "dataset = NCHS" option.
 output$distPlot2 <- renderPlotly({
-  p1 <- opioid_df %>%
-    dplyr::filter(drug == 'All Opioids' & characteristic == 'Age' &
-                  dataset == 'NCHS' & state == input$state.select) %>%
-    # Combine outpatient nad inpatient
-    group_by(qdate, level) %>%
-    summarize(count = sum(count)) %>%
+  p1 <- summarized_opioid_df %>%
+    dplyr::filter(dataset == 'NCHS' & state == input$state.select) %>%
     ggplot(aes(x = qdate, y = count, group = level, color = level)) +
       theme_minimal() +
       geom_line()
@@ -1398,44 +1285,11 @@ output$distPlot2 <- renderPlotly({
   ggplotly(p1)
 })
 
-## Time Series
-df_time_series_interactive <- reactive({
-  opioid_time_series
-})
-
-
-output$opioid_time_series_interactive_1 <- renderPlotly({
-  # User must provide inputs
-  req(input$state)
-  # Dataset must have rows
-  req(nrow(df_time_series_interactive()) > 0)
-  
-  p1 <- df_time_series_interactive() %>%
-    ggplot(aes(x = year_quarter, y = count, group = level, color = level,
-               text = paste0("Quarter: ", year_quarter, "\n", 
-                             "Count: ", scales::comma(count)) )) +
-    geom_line() +
-    labs(x = NULL, y = "Count", color = "Age Category") +
-    scale_x_discrete(breaks = c("2016 Q1", "2017 Q1", "2018 Q1", "2019 Q1",
-                                "2020 Q1", "2021 Q1", "2022 Q1")) +
-    scale_y_continuous(labels = scales::comma) +
-    # Apply Yale branding colors
-    scale_color_manual(values = yale_colors) +
-    facet_wrap(~ dataset) +
-    theme_minimal(base_size = 15) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-  
-  ggplotly(p1, tooltip = c("text"))
-})
-
 
 output$opioid_time_series_interactive_2 <- renderPlotly({
-  p <- opioid_df %>%
-    filter(drug == 'All Opioids' & characteristic == 'Sex' & state == "US") %>%
-    group_by(dataset, state, year_quarter, level) %>%
-    summarize(count = sum(count, na.rm = TRUE)) %>%
-    ungroup() %>%
-    filter(count > 0) %>%
+  p <- summarized_opioid_df %>%
+    # Filter out the yearly counts and only keep the quarterly counts.
+    .[!str_detect(summarized_opioid_df$year_quarter, "NA"), ] %>%
     ggplot(aes(x = year_quarter, y = count, group = level, color = level,
                text = paste0("Quarter: ", year_quarter, "\n",
                              "Count: ", scales::comma(count)) )) +
