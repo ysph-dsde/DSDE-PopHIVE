@@ -361,3 +361,43 @@ comp.Y <- a2 %>%
 ggplot(comp.Y) +
   geom_line(aes(x=date, y=NY))+
 geom_line(aes(x=date, y=SC))
+
+
+##IDEA: use the correlations in lagged search data from current year (available real time)
+#to inform location weighting...then apply these weighting to the ED data
+
+
+#yearsize
+test1  <- read.csv('./Data/plot_files/e1_age_epic_age_rsv.csv') %>%
+  dplyr::select(geography, date, Level,N_cases_epic) %>%
+  rename(agec=Level, state=geography) %>%
+  mutate(date=as.Date(date),
+         year=year(date),
+         week=week(date),
+         epiyr=if_else(week<=26,year-1, year)) %>%
+  arrange(state, agec, date) %>%
+  filter(agec=='<1 Years' & epiyr>=2023) %>%
+  group_by(state, epiyr) %>%
+  summarize(rsv_int = max(N_cases_epic, na.rm=T)) %>%
+  reshape2::dcast(state~epiyr, value.var='rsv_int') %>%
+  rename(yr2024=`2024`, yr2023=`2023`) %>%
+  mutate(ratio=yr2024/yr2023)
+
+ggplot(test1) +
+  geom_point(aes(x=yr2023, ratio))
+
+#prop <1
+test1  <- read.csv('./Data/plot_files/e1_age_epic_age_rsv.csv') %>%
+  dplyr::select(geography, date, Level,N_cases_epic) %>%
+  rename(agec=Level, state=geography) %>%
+  mutate(date=as.Date(date),
+         year=year(date),
+         week=week(date),
+         epiyr=if_else(week<=26,year-1, year)) %>%
+  arrange(state, agec, date) %>%
+  filter(agec %in% c('<1 Years','1-4 Years') & epiyr>=2023) %>%
+  group_by(state, epiyr) %>%
+  summarize(rsv_int = max(N_cases_epic, na.rm=T)) %>%
+  reshape2::dcast(state~epiyr, value.var='rsv_int') %>%
+  rename(yr2024=`2024`, yr2023=`2023`) %>%
+  mutate(ratio=yr2024/yr2023)
