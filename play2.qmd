@@ -615,7 +615,7 @@ output$distPlotRSV_dwh <- renderPlotly({
 pal1 <- pal1[-6]
  
 rsv_ts_comp <- dwh %>%
-    filter(geography=='New York' ) %>%
+    filter(geography==input$state.select2 ) %>%
     ggplot()+
   geom_line(aes(x=date, y=outcome_3m, color=outcome_label1,linetype=outcome_label1, group=outcome_label1,
                 text=paste0(geography, "<br>", 
