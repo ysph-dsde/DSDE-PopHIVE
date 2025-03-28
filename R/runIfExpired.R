@@ -45,7 +45,7 @@ verify_update = function(test_file,  ds_path){
     previous_file <- file_list[1]
   }
   
-  ref_file <- read_parquet(paste0("./Data/nssp_ed1/", previous_file))
+  ref_file <- read_parquet(paste0(ds_path, previous_file))
   
   check_names = names(ref_file) == names(test_file)
   
