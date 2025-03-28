@@ -435,40 +435,131 @@ d1 <- open_dataset('./Data/NSSP_detailed.parquet') %>%
   collect() %>%
   as.data.frame()
 
-#combine hospital, wastewater, ED visits
-dwh <- d1 %>%
-  full_join(w1, by=c('state','date')) %>%
-  full_join(h1, by=c('state', 'date')) %>%
-  full_join(e1_all_ages, by=c('state','date')) %>%
-  full_join(g1_state, by=c('state','date')) %>%
-    arrange(state, date) %>%
-  group_by(state) %>%
+
+#########Harmonize the datasets
+
+nssp_harmonized <- d1 %>%
+  rename(Outcome_value1=percent_visits_rsv,
+         geography=state) %>%
+  mutate(outcome_type='ED',
+          outcome_label1 = 'Pct of ED visits',
+    domain = 'Respiratory infections',
+    date_resolution = 'week',
+    update_frequency = 'weekly',
+    source = 'CDC NSSP',
+    url = 'https://healthdata.gov/dataset/NSSP-Emergency-Department-Visit-Trajectories-by-St/hr4c-e7p6/',
+    geo_strata = 'state',
+    age_strata = 'none',
+    race_strata = 'none',
+    race_level = NA_character_,
+    additional_strata1 = 'none',
+    additional_strata_level = NA_character_,
+    sex_strata = 'none',
+    sex_level = NA_character_)
+
+ww1_harmonized <- w1 %>%
+  rename(Outcome_value1=rsv_ww,
+         geography=state) %>%
+  mutate(outcome_type='WasteWater',
+          outcome_label1 = 'Waste Water',
+domain = 'Respiratory infections',
+    date_resolution = 'week',
+    update_frequency = 'weekly',
+    source = 'CDC NWWS',
+    url = 'https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/RSVStateLevelDownloadCSV.csv',
+    geo_strata = 'state',
+    age_strata = 'none',
+    race_strata = 'none',
+    race_level = NA_character_,
+    additional_strata1 = 'none',
+    additional_strata_level = NA_character_,
+    sex_strata = 'none',
+    sex_level = NA_character_)
+
+h1_harmonized <- h1 %>% 
+  rename(Outcome_value1=hosp_rate,
+         geography=state) %>%
+  mutate(outcome_type='Inpatient Hospitalization',
+          outcome_label1 = 'Hospitalization Rate',
+    domain = 'Respiratory infections',
+    date_resolution = 'week',
+    update_frequency = 'weekly',
+    source = 'CDC RSV-NET (RespNet)',
+    url = 'https://data.cdc.gov/resource/kvib-3txy.csv',
+    geo_strata = 'state',
+    age_strata = 'none',
+    race_strata = 'none',
+    race_level = NA_character_,
+    additional_strata1 = 'none',
+    additional_strata_level = NA_character_,
+    sex_strata = 'none',
+    sex_level = NA_character_)
+
+epic_rsv_aggregate_harmonized <- e1_all_ages %>%
+rename(Outcome_value1=N_epic,
+         geography=state) %>%
+  mutate(outcome_type='ED',
+          outcome_label1 = 'ED (N)',
+    domain = 'Respiratory infections',
+    date_resolution = 'week',
+    update_frequency = 'weekly',
+    source = 'Epic Cosmos',
+    url = 'https://www.epicresearch.org/',
+    geo_strata = 'state',
+    age_strata = 'none',
+    race_strata = 'none',
+    race_level = NA_character_,
+    additional_strata1 = 'none',
+    additional_strata_level = NA_character_,
+    sex_strata = 'none',
+    sex_level = NA_character_)
+
+g1_state_harmonized_v1 <- g1_state %>%
+  rename(Outcome_value1=rsv_novax,
+         geography=state) %>%
+  mutate(outcome_type='Google Searches',
+          outcome_label1 = 'Google Searches 1',
+    domain = 'Respiratory infections',
+    date_resolution = 'week',
+    update_frequency = 'weekly',
+    source = 'Google Health Trends',
+    url = 'https://dissc-yale.github.io/gtrends_collection/',
+    geo_strata = 'state',
+    age_strata = 'none',
+    race_strata = 'none',
+    race_level = NA_character_,
+    additional_strata1 = 'none',
+    additional_strata_level = NA_character_,
+    sex_strata = 'none',
+    sex_level = NA_character_)
+
+g1_state_harmonized_v2 <- g1_state %>%
+  rename(Outcome_value1=rsv_novax2,
+         geography=state) %>%
+  mutate(outcome_type='Google Searches',
+          outcome_label1 = 'Google Searches 2',
+    domain = 'Respiratory infections',
+    date_resolution = 'week',
+    update_frequency = 'weekly',
+    source = 'Google Health Trends',
+    url = 'https://dissc-yale.github.io/gtrends_collection/',
+    geo_strata = 'state',
+    age_strata = 'none',
+    race_strata = 'none',
+    race_level = NA_character_,
+    additional_strata1 = 'none',
+    additional_strata_level = NA_character_,
+    sex_strata = 'none',
+    sex_level = NA_character_)
+
+dwh <- bind_rows(nssp_harmonized, ww1_harmonized,h1_harmonized,epic_rsv_aggregate_harmonized,g1_state_harmonized_v1, g1_state_harmonized_v2) %>%
+  filter(date >=as.Date('2023-07-01')) %>%
+    arrange(geography, outcome_label1,date) %>%
+  group_by(geography,outcome_label1) %>%
   filter(date>='2023-07-01') %>%
-  mutate(percent_visits_rsv_3m = zoo::rollmean(percent_visits_rsv, k = 3, fill = NA, align='right'),
-        rsv_ww_3m = zoo::rollmean(rsv_ww, k = 3, fill = NA, align='right'),
-        hosp_rate_3m = zoo::rollmean(hosp_rate, k = 3, fill = NA, align='right'),
-        N_epic_3m = zoo::rollmean(N_epic, k = 3, fill = NA, align='right'),
-        google_3m_a = zoo::rollmean(search_volume, k = 3, fill = NA, align='right'),
-        google_3m_b = zoo::rollmean(rsv_novax, k = 3, fill = NA, align='right'),
-        google_3m_c = zoo::rollmean(rsv_novax2, k = 3, fill = NA, align='right'),
-    
-       percent_visits_rsv_3m = percent_visits_rsv_3m / max(percent_visits_rsv_3m, na.rm=T)*100,
-      rsv_ww_3m= rsv_ww_3m/max(rsv_ww_3m, na.rm=T)*100,
-       hosp_rate_3m=hosp_rate_3m/max(hosp_rate_3m, na.rm=T)*100,
-       N_epic_3m = N_epic_3m/max(N_epic_3m, na.rm=T)*100,
-       google_3m_a =google_3m_a/max(google_3m_a, na.rm=T)*100,
-       google_3m_b =google_3m_b/max(google_3m_b, na.rm=T)*100,
-       google_3m_c =google_3m_c/max(google_3m_c, na.rm=T)*100,
+  mutate(outcome_3m = zoo::rollmean(Outcome_value1, k = 3, fill = NA, align='right'),
+                outcome_3m = outcome_3m / max(outcome_3m, na.rm=T)*100
        )
-
-# dwh %>%
-#   filter(state=='New York' & date>='2023-07-01') %>%
-#   ggplot(aes(x=date, y=google_3m_b)) +
-#     geom_line()+
-#     geom_line(aes(x=date, y=google_3m_a), col='red') +
-#   geom_line(aes(x=date, y=google_3m_c), col='blue') +
-#   geom_line(aes(x=date, y=N_epic_3m), col='blue', linewidth=2) 
-
 
 dates2 <- MMWRweek(as.Date(dwh$date))
 
@@ -481,16 +572,9 @@ dwh <- cbind.data.frame(dwh,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
           epiwk=epiwk-26
   )
 
-write.csv(dwh,'./Data/plot_files/dwh_combined_plot1.csv')
+write.csv(dwh,'./Data/plot_files/dwh_combined_plot1_long.csv')
 
-#ED visits by demographics
-# d1 <- open_dataset('./Data/NSSP_demographics.parquet') %>%
-#   collect()
-#   filter(county=='All'  ) %>%
-#   rename(state=geography, date='week_end') %>%
-#   dplyr::select(state, date, percent_visits_rsv) %>%
-#   collect() %>%
-#   as.data.frame()
+
 ```
 
 
@@ -527,25 +611,30 @@ output$distPlotRSV3 <- renderPlotly({
 
 output$distPlotRSV_dwh <- renderPlotly({
   
-  rsv_ts_comp <- dwh %>%
-    filter(state==input$state.select2 & date >=as.Date('2023-07-01')) %>%
+ pal1 <- RColorBrewer::brewer.pal(n=length(unique(dwh$outcome_label1))+1,'Set1' )
+pal1 <- pal1[-6]
+ 
+rsv_ts_comp <- dwh %>%
+    filter(geography=='New York' ) %>%
     ggplot()+
-  geom_line(aes(x=date, y=percent_visits_rsv_3m, color='ED'), lty=3) +
-  geom_line(aes(x=date, y=rsv_ww_3m, color='WasteW')) +
-  geom_line(aes(x=date, y=hosp_rate_3m,color='Hosp'), lty=2) +  
-  geom_line(aes(x=date, y=N_epic_3m,color='Epic'), lty=1) +  
-  geom_line(aes(x=date, y=google_3m_b,color='Google'), lty=1) +  
-  geom_line(aes(x=date, y=google_3m_c,color='Google (adj)'), lty=1) +  
+  geom_line(aes(x=date, y=outcome_3m, color=outcome_label1,linetype=outcome_label1, group=outcome_label1,
+                text=paste0(geography, "<br>", 
+                            source,
+                           outcome_label1, "<br>",
+                           outcome_label1, "<br>",
+                           Outcome_value1, "<br>",
+                           date, "<br>"
+                           ))) +
 
-            theme_minimal()+
+            theme_minimal() +
     xlab('Date')+
+    labs(color='Source') +
     ylab('RSV activity (scaled to 100)')+
-    scale_color_manual(name = "RSV", values = c("ED" = "#e41a1c", "WasteW"="#377eb8", 'Hosp'='#4daf4a', 'Epic'='#984ea3','Google'='#ff7f0070' ,'Google (adj)'='#a65628' ))+
+   scale_color_manual(values=pal1) +
     ggtitle(input$state.select2)
   
-  scale_colour_viridis_d() 
-  
-  ggplotly(rsv_ts_comp)
+  ggplotly(rsv_ts_comp,tooltip='text')
+
 })
 
 
