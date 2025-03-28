@@ -375,7 +375,15 @@ dates <- seq.Date(from=as.Date('2022-10-01'), to=as.Date('2025-01-30'),by='week'
 #   filter(county!='All') %>%collect()
 
 
-# Waste water Latest: https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/RSVStateLevelDownloadCSV.csv
+#Waste water Latest: 
+#RSV
+#https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/RSVStateLevelDownloadCSV.csv
+
+
+#fluA
+#ww_flu1 <- read.csv('https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/FluA/FluAStateMapDownloadCSV.csv')%>%
+#write.csv(ww_flu1,'./Data/FluStateLevelDownloadCSV_ww.csv')
+
 
 #hospitalizations
 #
@@ -384,9 +392,11 @@ dates <- seq.Date(from=as.Date('2022-10-01'), to=as.Date('2025-01-30'),by='week'
 
 # csv_to_parquet('./Data/NSSP_demographics.csv',path_to_parquet ='./Data/NSSP_demographics.parquet')
 
-h1 <- open_dataset('./Data/rsvnet_hosp.parquet') %>%
-  filter(`Region Type`=='State' & `Diagnostic Test Type`=='All' & Characteristic=='Not Stratified' & Region != 'All Sites') %>%
-  rename(state=Region, hosp_rate=`Crude Rate`, date=`Week Observed`) %>%
+h1 <- open_dataset('./Data/live_files/respnet_hosp.parquet') %>%
+  filter( site != 'Overall' & surveillance_network=='RSV-NET' & type=='Unadjusted Rate' & age_group=='Overall' &
+           sex=='Overall' & race_ethnicity=='Overall') %>%
+  rename(state=site, hosp_rate=weekly_rate, date=X_weekenddate) %>%
+  mutate(date=as.Date(substr(date,1,10)) ) %>%
   dplyr::select(state, date, hosp_rate) %>%
   collect() %>%
   as.data.frame()
