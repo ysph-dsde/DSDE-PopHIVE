@@ -1801,7 +1801,7 @@ waffle_2022 <- subset %>%
       name = "Count (2022)", 
       labels = scales::comma    # Format labels with commas
     ) + 
-    labs(title = "AHRQ") +
+    labs(title = "Hospitalizations (AHRQ)") +
     theme(legend.position = "",
           plot.title = element_text(size = 14),  # Increase title size
           axis.ticks = element_blank(),
@@ -1840,7 +1840,7 @@ waffle_2022 <- subset %>%
       name = "Count (2022)", 
       labels = scales::comma    # Format labels with commas
     ) + 
-    labs(title = "\ \ \ \ \ \ CDC WONDER") +
+    labs(title = "\ \ \ \ \ \ Deaths (CDC WONDER)") +
     theme(legend.position = "right",
           plot.title = element_text(size = 14),  # Increase title size
           axis.ticks = element_blank(),
@@ -1914,6 +1914,8 @@ output$opioid_time_series_interactive_1 <- renderPlotly({
   req(nrow(df_time_series_interactive()) > 0)
   
   p1 <- df_time_series_interactive() %>%
+    mutate(dataset=if_else(dataset=='NCHS', 'Deaths (NCHS)',
+                   if_else(dataset=='AHRQ', 'Hospitalizations (AHRQ)',dataset         ))) %>%
     ggplot(aes(x = year_quarter, y = count, 
                group = level, color = level,
                text = paste0("Quarter: ", year_quarter, "\n",
@@ -1927,7 +1929,7 @@ output$opioid_time_series_interactive_1 <- renderPlotly({
                                 "2022 Q1")) +
     scale_y_continuous(labels = scales::comma) +
     scale_color_manual(values = yale_colors) + # Apply Yale branding colors
-    facet_wrap(~dataset) +
+    facet_wrap(~dataset, scales='free_y') +
     theme_minimal(base_size = 15) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1))
   
@@ -1939,6 +1941,8 @@ output$opioid_time_series_interactive_1 <- renderPlotly({
 output$opioid_time_series_interactive_2 <- renderPlotly({
   
   p <- df_opioid %>%
+      mutate(dataset=if_else(dataset=='CDC WONDER', 'Deaths (NCHS)',
+                   if_else(dataset=='AHRQ', 'Hospitalizations (AHRQ)',dataset         ))) %>%
     filter(drug=='All Opioids' & 
              characteristic=='Sex' &
              state == "US") %>%
@@ -1960,7 +1964,7 @@ output$opioid_time_series_interactive_2 <- renderPlotly({
                                 "2022 Q1")) +
     scale_y_continuous(labels = scales::comma) +
     scale_color_manual(values = yale_colors) + # Apply Yale branding colors
-    facet_wrap(~dataset) +
+    facet_wrap(~dataset, scales='free_y') +
     theme_minimal(base_size = 13) +
     theme(axis.text.x = element_text(angle = 45,  hjust = 1))
   
