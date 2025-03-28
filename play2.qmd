@@ -616,11 +616,18 @@ pal1 <- pal1[-6]
  
 rsv_ts_comp <- dwh %>%
     filter(geography==input$state.select2 ) %>%
+    mutate(ds_label = if_else(outcome_label1=='Google Searches 1', 'Google 1',
+           if_else(outcome_label1=='Google Searches 2', 'Google 2',
+                 if_else(outcome_label1=='Pct of ED visits', 'ED visits (CDC/NSSP)',           
+                         if_else(outcome_label1=='ED (N)', 'ED visits (Epic cosmos)', 
+                                 if_else(outcome_label1=='Hospitalizations', 'Hospitalization Resp-Net)', outcome_label1
+                                     
+                   )))))
+           ) %>%
     ggplot()+
-  geom_line(aes(x=date, y=outcome_3m, color=outcome_label1,linetype=outcome_label1, group=outcome_label1,
+  geom_line(aes(x=date, y=outcome_3m, color=ds_label,linetype=ds_label, group=ds_label,
                 text=paste0(geography, "<br>", 
-                            source,
-                           outcome_label1, "<br>",
+                            source, "<br>", 
                            outcome_label1, "<br>",
                            Outcome_value1, "<br>",
                            date, "<br>"
