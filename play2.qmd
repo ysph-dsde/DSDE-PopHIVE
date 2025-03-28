@@ -1973,6 +1973,7 @@ output$opioid_time_series_interactive_2 <- renderPlotly({
     scale_color_manual(values = yale_colors) + # Apply Yale branding colors
     facet_wrap(~dataset, scales='free_y') +
     theme_minimal(base_size = 13) +
+    ylim(0, NA) +
     theme(axis.text.x = element_text(angle = 45,  hjust = 1))
   
   ggplotly(p, tooltip = "text")
