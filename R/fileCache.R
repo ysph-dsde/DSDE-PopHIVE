@@ -38,9 +38,9 @@ retrievePath <- function(fname, basepath='.', goalDate=lubridate::now()) {
   fullPaths[idx]
 }
 
-#' Retrieve an RDS modified nearest to a specific date
+#' Retrieve an parquet modified nearest to a specific date
 #' 
-#' Retrieves an RDS file stored in \code{basepath/fname} that has
+#' Retrieves an parquet file stored in \code{basepath/fname} that has
 #' the closest modification date to \code{goalDate}. If no such file exists, an
 #' error will be thrown.
 #'
@@ -58,18 +58,18 @@ retrievePath <- function(fname, basepath='.', goalDate=lubridate::now()) {
 #' identical(mtcars, mtcars_retrieved)
 #'
 #' @export
-retrieveRDS <- function(fname, basepath='.', goalDate=Sys.time())
+retrievePQT <- function(fname, basepath='.', goalDate=Sys.time())
   retrievePath(fname, basepath, goalDate) %>% read_parquet()
 
 #' Store an R object into the file cache
 #' 
 #' Given an R object, attempts to store it in the directory
 #' \code{basepath/fname}. The name given to the file will be of the form
-#' \code{DATE.rds}, where \code{DATE} is of the format
+#' \code{DATE.PQT}, where \code{DATE} is of the format
 #' \code{\%Y_\%m_\%d_\%H_\%M}.  An error will be thrown if \code{basepath} does
 #' not exist. However, if \code{basepath/fname} does not exist, an attempt will
 #' be made to create it. The \code{DATE} is the current time. Intended to be
-#' used with \code{\link{retrieveRDS}}. See \code{\link{mostRecentTimestamp}}
+#' used with \code{\link{retrievePQT}}. See \code{\link{mostRecentTimestamp}}
 #' for an usage example.
 #' 
 #' @param fname The name of the directory in \code{basepath} where various
@@ -84,15 +84,15 @@ retrieveRDS <- function(fname, basepath='.', goalDate=Sys.time())
 #' @return A message announcing the path the object has been written to
 #' 
 #' @examples
-#' saveRDS(mtcars, 'cars')
-#' saveRDS(mtcars, 'cars')
+#' savePQT(mtcars, 'cars')
+#' savePQT(mtcars, 'cars')
 #' # Now the filesystem has, in '.':
 #' # ├── mtcars
-#' # │   ├── 2020_04_09_16_40.rds
-#' # │   ├── 2020_04_09_16_41.rds
+#' # │   ├── 2020_04_09_16_40.parquet
+#' # │   ├── 2020_04_09_16_41.parquet
 #'
 #' @export
-storeRDS <- function(obj, fname, basepath='.') {
+storePQT <- function(obj, fname, basepath='.') {
   
   if (!dir.exists(basepath))
     stop(sprintf("Basepath '%s' does not exist. Cannot write file.", basepath))
