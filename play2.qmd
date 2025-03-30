@@ -90,7 +90,6 @@ This platform is designed to give its users timely, clear, and useful insights i
 
 *RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months. State-level data typically represent certain regions or subsets of the population and do not necessarily represent disease spread in the entire state*
 
-
 ```{r}
 #| context: data
 #| include: false
@@ -107,7 +106,6 @@ epic_ed_combo <- read_csv('./Data/plot_files/epic_ed_combo_rsv_flu_covid.csv')
 
 rsv_county_filled_nssp <- read_csv('./Data/plot_files/rsv_county_filled_map_nssp.csv')
 ```
-
 
 ```{r rsv_plots}
 #| context: server
@@ -291,9 +289,9 @@ plotlyOutput("distPlotRSV_dwh")
 
 ```
 
-|                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+|                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 |------------------------------------------------------------------------|
-| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). The Google Trends data are obtained from the Google Health Trends API (volume of searches for 'rsv', subtracting volume of searches for category "respiratory syncytial virus vaccine" (Knowledge graph: /g/11j30ybfx6) )   |
+| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). The Google Trends data are obtained from the Google Health Trends API (volume of searches for 'rsv', subtracting volume of searches for category "respiratory syncytial virus vaccine" (Knowledge graph: /g/11j30ybfx6) ). Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/dwh_combined_plot1_long.csv). |
 
 #### Trends in positive tests
 
@@ -310,7 +308,7 @@ plotlyOutput("distPlotRSV3")
 
 ```
 
-These data come from the NREVSS surveillance system, which is comprised of laboratories around the US
+These data come from the NREVSS surveillance system, which is comprised of laboratories around the US. Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/rsv_ts_nrevss_test_rsv.csv).
 
 #### By age
 
@@ -334,7 +332,7 @@ plotlyOutput("distPlotRSV_hosp_age")
 
 ```
 
-The hospitalization data comes from the RSV-NET, a CDC-supported network of sites around the US that tracks hospitalizations from RSV, influenza, and COVID-19. Data are smoothed with a 3 week average for vizualization.
+The hospitalization data comes from the RSV-NET, a CDC-supported network of sites around the US that tracks hospitalizations from RSV, influenza, and COVID-19. Data are smoothed with a 3 week average for vizualization. Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/rsv_ts_nrevss_test_rsv.csv).
 
 #### Map of ED visits (state)
 
@@ -357,6 +355,8 @@ sliderInput("selected_date", label=NULL,
       plotlyOutput("epicMapRSV")
 
 ```
+
+Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/epic_ed_combo_rsv_flu_covid.csv).
 
 #### Map of ED visits (county)
 
@@ -393,11 +393,11 @@ plotly::ggplotly(p1)%>%
                                      subtitle,'</sup>')))
 ```
 
-The maps shows the percentage of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network.
+The maps shows the percentage of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network. Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/rsv_county_filled_map_nssp.csv).
 
 #### Maps of Google searches
 
-*Coming soon* 
+*Coming soon*
 
 ```{r}
 #| panel: toolbar
@@ -1042,7 +1042,6 @@ These data come from the [CDC WISQARS](https://wisqars.cdc.gov/) platform, which
 *Coming soon!*
 
 ::: panel-tabset
-
 #### Epic Cosmos
 
 *Coming soon!*
@@ -1051,8 +1050,6 @@ These data come from the [CDC WISQARS](https://wisqars.cdc.gov/) platform, which
 #| panel: fill
 
 ```
-
-
 :::
 
 ### Overdose attempts
@@ -1060,7 +1057,6 @@ These data come from the [CDC WISQARS](https://wisqars.cdc.gov/) platform, which
 *Coming soon!*
 
 ::: panel-tabset
-
 #### Epic Cosmos
 
 *Coming soon!*
@@ -1069,7 +1065,6 @@ These data come from the [CDC WISQARS](https://wisqars.cdc.gov/) platform, which
 #| panel: fill
 
 ```
-
 :::
 
 ### Obesity
@@ -1077,7 +1072,6 @@ These data come from the [CDC WISQARS](https://wisqars.cdc.gov/) platform, which
 *Coming soon!*
 
 ::: panel-tabset
-
 #### Epic Cosmos
 
 *Coming soon!*
@@ -1086,10 +1080,7 @@ These data come from the [CDC WISQARS](https://wisqars.cdc.gov/) platform, which
 #| panel: fill
 
 ```
-
-
 :::
-
 :::
 
 ## Opioids
@@ -1604,10 +1595,9 @@ Coming soon!
 
 ### Acknowledgements
 
-We thank all of the organizations and individuals who make their data available for health monitoring and research. 
+We thank all of the organizations and individuals who make their data available for health monitoring and research.
 
-Some data used in this platform come from Epic Cosmos, a dataset created in collaboration with a community of Epic health systems representing more than 295 million patient records from over 1633 hospitals and 37,900 clinics from all 50 states, D.C.,
-Lebanon, and Saudi Arabia. Epic data were obtained using the SlicerDicer tool in [Epic Cosmos.](https://www.epicresearch.org/about-us) and are presented here for non-commercial purposes.
+Some data used in this platform come from Epic Cosmos, a dataset created in collaboration with a community of Epic health systems representing more than 295 million patient records from over 1633 hospitals and 37,900 clinics from all 50 states, D.C., Lebanon, and Saudi Arabia. Epic data were obtained using the SlicerDicer tool in [Epic Cosmos.](https://www.epicresearch.org/about-us) and are presented here for non-commercial purposes.
 
 Google Trends data, representing search volume by week and state or metropolitan area, are obtained from the [Google Trends API](https://developers.google.com/terms/) for non-commercial purposes.
 
@@ -1622,5 +1612,3 @@ Feedback or suggestions? [Let us know!](https://docs.google.com/forms/d/e/1FAIpQ
 **Legal Disclaimer**
 
 These data and PopHIVE statistical outputs are provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement. In no event shall the authors, contributors, or copyright holders be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the data or the use or other dealings in the data.The PopHIVE statistical outputs are research tools intended for use in the fields of public health and medicine. They are not intended for clinical decision making, are not intended to be used in the diagnosis or treatment of patients and may not be useful or appropriate for any clinical purpose. Users of the PopHIVE statistical outputs should be aware of their responsibilities to ensure the ethical and appropriate use of this technology, including adherence to any applicable legal and regulatory requirements. The content and data provided with the statistical outputs do not replace the expertise of healthcare professionals. Healthcare professionals should use their professional judgment in evaluating the outputs of the PopHIVE statistical outputs.
-
-
