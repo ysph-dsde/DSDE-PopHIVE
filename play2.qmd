@@ -571,7 +571,7 @@ plotlyOutput("distPlotcovid_epic_ED_age")
 ###Pneumococcal disease
 #csv_to_parquet('https://data.cdc.gov/resource/qvzb-qs6p.csv',path_to_parquet ='./Data/ipd_cdc1998.parquet')
 
-ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2021.rds') %>%
+ipd1 <- readRDS('./Data/pneumococcus/ABCs_st_1998_2023.rds') %>%
   rename(agec = "Age.Group..years.",
          year=Year,
          st=IPD.Serotype,
