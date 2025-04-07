@@ -7,6 +7,7 @@ library(MMWRweek)
 
 source('./R/runIfExpired.R') #function for archiving
 source('./R/epic_age_import.R')
+source('./R/harmonize_epic.R')
 
 #Creates a time/date stamped parquet file in the folder indicated in runIfExpired. 
 #if a file has been downloaded within past week (24*7 hours), 
@@ -104,9 +105,20 @@ verify_update(  test_file = cdc_rsvnet, ds_path='./Data/rsvnet/') %>%
 h1.age <- cdc_rsvnet %>%
   filter(state!="RSV-NET" & sex=='All' & race=='All' & type=='Crude Rate') %>%
   rename( hosp_rate=rate, date=week_ending_date, Level=age_category) %>%
+  filter(Level %in% c('1-4 years', '0-<1 year','5-17 years', '18-49 years' ,
+                      "≥65 years" ,"50-64 years" )) %>%
+  mutate( Level = if_else(Level=='0-<1 year',"<1 Years",
+                          if_else( Level=='1-4 years', "1-4 Years",
+                          if_else(Level=="5-17 years" ,"5-17 Years",
+                          if_else(Level=="18-49 years" ,"18-49 Years",
+                          if_else(Level=="50-64 years" ,"50-64 Years",
+                           if_else(Level=="≥65 years",'65+ Years', 'other'               
+                                  ))))))
+  ) %>%
   dplyr::select(state, date, hosp_rate, Level) %>%
   ungroup() %>%
   filter( date >=as.Date('2023-07-01')) %>%
+  arrange(state, Level, date) %>%
   group_by(state, Level) %>%
   mutate(hosp_rate_3m=zoo::rollmean(hosp_rate, k = 3, fill = NA, align='right'),
          scale_age=hosp_rate_3m/max(hosp_rate_3m, na.rm=T )*100,
@@ -317,6 +329,13 @@ ww1_harmonized <- open_dataset('./Data/live_files/wastewater_rsv.parquet') %>%
 ###Epic ED for RSV
 #######################################
 
+epic_ed_virus <- open_dataset( './Data/harmonized_epic_flu_rsv_covid.parquet') %>%
+  collect()
+
+epic_ed_virus_all_age <- epic_ed_virus %>%
+  group_by(outcome_name, outcome_type, geography,date ) %>%
+  summarize( N_virus_pos =sum(Outcome_value4, na.rm=T), N_visits=sum(Outcome_value5, na.rm=T) )
+
 e1 <- readr::read_csv('./Data/Epic Cosmos Data/RSVICD10week_age_state.csv', skip=15, col_names=F) %>%
   rename(geography=X1, age=X2) %>%
   tidyr::fill( geography, .direction = 'down') %>%
@@ -425,11 +444,11 @@ write.csv(epic_ed_combo, './Data/plot_files/epic_ed_combo_rsv_flu_covid.csv')
 
 dwh <- bind_rows(nssp_harmonized, ww1_harmonized,h1_harmonized,epic_rsv_aggregate_harmonized,g1_state_harmonized_v1, g1_state_harmonized_v2) %>%
   filter(date >=as.Date('2023-07-01')) %>%
-  arrange(geography, outcome_label1,date) %>%
-  group_by(geography,outcome_label1) %>%
+  arrange(geography, outcome_label1,source,date) %>%
+  group_by(geography,outcome_label1, source) %>%
   filter(date>='2023-07-01') %>%
   mutate(outcome_3m = zoo::rollmean(Outcome_value1, k = 3, fill = NA, align='right'),
-         outcome_3m = outcome_3m / max(outcome_3m, na.rm=T)*100
+         outcome_3m_scale = outcome_3m / max(outcome_3m, na.rm=T)*100
   )
 
 dates2 <- MMWRweek(as.Date(dwh$date))

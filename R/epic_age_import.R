@@ -18,9 +18,10 @@ epic_age_import <- function(ds_name, skipN=15) {
                             if_else( age %in%  c('? 1 and < 5 years','1 year or more and less than 5 years'),'1-4 Years',
                                      if_else(age %in% c('? 5 and < 18 years','5 years or more and less than 18 years (1)') , "5-17 Years",
                                              if_else( age %in% c("? 18 and < 65 years",'18 years or more and less than 65 years') ,"18-64 Years" ,         
-                                                      if_else( age %in% c("65 years or more","? 65 and < 110 years") , "65+ Years" , NA_character_        
+                                                      if_else( age %in% c("65 years or more","? 65 and < 110 years") , "65+ Years" , 
+                                                               if_else(age=='Total','Total',NA_character_        
                                                                  
-                                                                       ) ))))) %>%
+                                                                       ) )))))) %>%
     dplyr::select(-age) %>%
     ungroup() %>%
     arrange( geography,Level, date) %>%
