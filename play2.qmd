@@ -153,7 +153,7 @@ rsv_ts_comp <- rsv_all_indicators_state %>%
                    )))))
            ) %>%
     ggplot()+
-  geom_line(aes(x=date, y=outcome_3m, color=ds_label,linetype=ds_label, group=ds_label,
+  geom_line(aes(x=date, y=outcome_3m_scale, color=ds_label,linetype=ds_label, group=ds_label,
                 text=paste0(geography, "<br>", 
                             source, "<br>", 
                            outcome_label1, "<br>",
