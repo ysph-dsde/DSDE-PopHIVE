@@ -1,0 +1,111 @@
+"","dataset","state","year_quarter","level","count"
+"1","AHRQ","US","2016 NA","Female",837950
+"2","AHRQ","US","2016 NA","Male",903950
+"3","AHRQ","US","2016 Q1","Female",200350
+"4","AHRQ","US","2016 Q1","Male",213100
+"5","AHRQ","US","2016 Q2","Female",209200
+"6","AHRQ","US","2016 Q2","Male",223450
+"7","AHRQ","US","2016 Q3","Female",221500
+"8","AHRQ","US","2016 Q3","Male",241350
+"9","AHRQ","US","2016 Q4","Female",206900
+"10","AHRQ","US","2016 Q4","Male",226050
+"11","AHRQ","US","2017 NA","Female",848350
+"12","AHRQ","US","2017 NA","Male",937100
+"13","AHRQ","US","2017 Q1","Female",212600
+"14","AHRQ","US","2017 Q1","Male",231100
+"15","AHRQ","US","2017 Q2","Female",219150
+"16","AHRQ","US","2017 Q2","Male",242200
+"17","AHRQ","US","2017 Q3","Female",217200
+"18","AHRQ","US","2017 Q3","Male",242400
+"19","AHRQ","US","2017 Q4","Female",199400
+"20","AHRQ","US","2017 Q4","Male",221400
+"21","AHRQ","US","2018 NA","Female",803050
+"22","AHRQ","US","2018 NA","Male",908100
+"23","AHRQ","US","2018 Q1","Female",195000
+"24","AHRQ","US","2018 Q1","Male",217550
+"25","AHRQ","US","2018 Q2","Female",204500
+"26","AHRQ","US","2018 Q2","Male",229350
+"27","AHRQ","US","2018 Q3","Female",208400
+"28","AHRQ","US","2018 Q3","Male",240450
+"29","AHRQ","US","2018 Q4","Female",195150
+"30","AHRQ","US","2018 Q4","Male",220750
+"31","AHRQ","US","2019 NA","Female",762600
+"32","AHRQ","US","2019 NA","Male",886550
+"33","AHRQ","US","2019 Q1","Female",188000
+"34","AHRQ","US","2019 Q1","Male",210700
+"35","AHRQ","US","2019 Q2","Female",192950
+"36","AHRQ","US","2019 Q2","Male",223800
+"37","AHRQ","US","2019 Q3","Female",197200
+"38","AHRQ","US","2019 Q3","Male",233800
+"39","AHRQ","US","2019 Q4","Female",184450
+"40","AHRQ","US","2019 Q4","Male",218250
+"41","AHRQ","US","2020 NA","Female",684050
+"42","AHRQ","US","2020 NA","Male",862650
+"43","AHRQ","US","2020 Q1","Female",180100
+"44","AHRQ","US","2020 Q1","Male",216650
+"45","AHRQ","US","2020 Q2","Female",155300
+"46","AHRQ","US","2020 Q2","Male",206050
+"47","AHRQ","US","2020 Q3","Female",183950
+"48","AHRQ","US","2020 Q3","Male",231950
+"49","AHRQ","US","2020 Q4","Female",164700
+"50","AHRQ","US","2020 Q4","Male",208000
+"51","AHRQ","US","2021 NA","Female",681500
+"52","AHRQ","US","2021 NA","Male",898100
+"53","AHRQ","US","2021 Q1","Female",162900
+"54","AHRQ","US","2021 Q1","Male",214750
+"55","AHRQ","US","2021 Q2","Female",181850
+"56","AHRQ","US","2021 Q2","Male",239900
+"57","AHRQ","US","2021 Q3","Female",174500
+"58","AHRQ","US","2021 Q3","Male",232500
+"59","AHRQ","US","2021 Q4","Female",162250
+"60","AHRQ","US","2021 Q4","Male",210950
+"61","CDC WONDER","US","2018 NA","Female",35838
+"62","CDC WONDER","US","2018 NA","Male",77370
+"63","CDC WONDER","US","2018 Q1","Female",9141
+"64","CDC WONDER","US","2018 Q1","Male",19229
+"65","CDC WONDER","US","2018 Q2","Female",9013
+"66","CDC WONDER","US","2018 Q2","Male",19644
+"67","CDC WONDER","US","2018 Q3","Female",8989
+"68","CDC WONDER","US","2018 Q3","Male",19449
+"69","CDC WONDER","US","2018 Q4","Female",8695
+"70","CDC WONDER","US","2018 Q4","Male",19048
+"71","CDC WONDER","US","2019 NA","Female",36887
+"72","CDC WONDER","US","2019 NA","Male",83199
+"73","CDC WONDER","US","2019 Q1","Female",8926
+"74","CDC WONDER","US","2019 Q1","Male",19362
+"75","CDC WONDER","US","2019 Q2","Female",8806
+"76","CDC WONDER","US","2019 Q2","Male",19780
+"77","CDC WONDER","US","2019 Q3","Female",9255
+"78","CDC WONDER","US","2019 Q3","Male",21311
+"79","CDC WONDER","US","2019 Q4","Female",9900
+"80","CDC WONDER","US","2019 Q4","Male",22746
+"81","CDC WONDER","US","2020 NA","Female",47790
+"82","CDC WONDER","US","2020 NA","Male",114961
+"83","CDC WONDER","US","2020 Q1","Female",10529
+"84","CDC WONDER","US","2020 Q1","Male",24428
+"85","CDC WONDER","US","2020 Q2","Female",13062
+"86","CDC WONDER","US","2020 Q2","Male",32553
+"87","CDC WONDER","US","2020 Q3","Female",12449
+"88","CDC WONDER","US","2020 Q3","Male",30043
+"89","CDC WONDER","US","2020 Q4","Female",11750
+"90","CDC WONDER","US","2020 Q4","Male",27937
+"91","CDC WONDER","US","2021 NA","Female",56280
+"92","CDC WONDER","US","2021 NA","Male",133041
+"93","CDC WONDER","US","2021 Q1","Female",14038
+"94","CDC WONDER","US","2021 Q1","Male",31879
+"95","CDC WONDER","US","2021 Q2","Female",14352
+"96","CDC WONDER","US","2021 Q2","Male",34774
+"97","CDC WONDER","US","2021 Q3","Female",14456
+"98","CDC WONDER","US","2021 Q3","Male",33866
+"99","CDC WONDER","US","2021 Q4","Female",13434
+"100","CDC WONDER","US","2021 Q4","Male",32522
+"101","CDC WONDER","US","2022 NA","Female",55440
+"102","CDC WONDER","US","2022 NA","Male",136618
+"103","CDC WONDER","US","2022 Q1","Female",14081
+"104","CDC WONDER","US","2022 Q1","Male",33406
+"105","CDC WONDER","US","2022 Q2","Female",13485
+"106","CDC WONDER","US","2022 Q2","Male",33040
+"107","CDC WONDER","US","2022 Q3","Female",13766
+"108","CDC WONDER","US","2022 Q3","Male",34648
+"109","CDC WONDER","US","2022 Q4","Female",14108
+"110","CDC WONDER","US","2022 Q4","Male",35524
