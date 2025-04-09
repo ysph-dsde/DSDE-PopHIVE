@@ -75,6 +75,27 @@ yale_gradient <- c("#DDDDDD",
 "%!in%" <- function(x,y)!("%in%"(x,y))
 
 source("./R/epic_age_import.R")
+
+
+#Defines a general function that can be reused for age plots
+age_ts_plot <- function(ds.in=epic_ed_combo, scale_var=input$scale.rsv, outcome_select='RSV', tslabel='RSV'){
+  
+ plot_ds <- ds.in %>%
+    filter(geography==input$state.select5 & date >=as.Date('2023-07-01') & outcome_name==outcome_select, age_level != 'Total' ) %>%
+   mutate(plotvar = if_else(scale_var==T,Outcome_value3, Outcome_value2 ))
+ 
+ ts_compare <- plot_ds %>%
+    ggplot()+
+    geom_line(aes(x=date, y=plotvar, group_by=age_level, color=age_level)) +
+    theme_minimal()+
+    xlab('Date')+
+    ylab(paste0('Percent of ED visits for ', tslabel))+
+    scale_colour_viridis_d() +
+    ggtitle(paste0('ED visits for ', tslabel, ' in ',input$state.select5))
+  
+  ggplotly(ts_compare)
+  
+}
 ```
 
 ## Welcome to PopHIVE
