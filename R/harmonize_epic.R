@@ -61,11 +61,13 @@ epic_ed_combo <- bind_rows(epic_ed_rsv, epic_ed_flu , epic_ed_covid) %>%
     
     pct_ED_epic = N_ED_type / N_ED_epic_all_cause * 100,
     
+    pct_ED_epic = if_else(N_ED_type<5, min(pct_ED_epic, na.rm=T)/2, pct_ED_epic ), #if suppressed, half of posiivity
+    
     pct_ED_epic_smooth = zoo::rollapplyr(pct_ED_epic,3,mean, partial=T, na.rm=T),
     
     pct_ED_epic_smooth = if_else(is.nan(pct_ED_epic_smooth), NA, pct_ED_epic_smooth),
     
-    
+
     ED_epic_scale = 100 * pct_ED_epic_smooth / max(pct_ED_epic_smooth , na.rm =
                                                      T),
     

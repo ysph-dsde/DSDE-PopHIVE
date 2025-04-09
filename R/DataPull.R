@@ -336,7 +336,8 @@ epic_ed_virus <- open_dataset( './Data/live_files/epic_cosmos_flu_rsv_covid.parq
   collect()
 
 e1 <- epic_ed_virus %>%
-  mutate( geography= if_else(geography=='Total', 'United States', geography)) 
+  mutate( geography= if_else(geography=='Total', 'United States', geography)
+)
 
 e1 %>% 
   write.csv(., './Data/plot_files/EpicCosmos/e1_age_epic_age_rsv_flu_covid.csv')

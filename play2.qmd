@@ -251,8 +251,8 @@ output$epicMapRSV <- renderPlotly({
       filter(date == input$selected_date & age_level == '<1 Years' & outcome_name=='RSV') %>%
       mutate(state = state.abb[match(geography, state.name)] ,
              #Note, if >20%, cap at 20 for plotting!
-           Outcome_value2 = if_else(Outcome_value2>20,20, Outcome_value2) ,
-           Outcome_value2 = if_else(Outcome_value4<5, Outcome_value4*0.01 ,Outcome_value2) #deals with cell suppression
+           Outcome_value2 = if_else(Outcome_value2>20,20, Outcome_value2) 
+           #Outcome_value2 = if_else(Outcome_value4<5, Outcome_value4*0.01 ,Outcome_value2) #deals with cell suppression
            ) %>%
    filter(!is.na(state)) %>%
    as.data.frame()
