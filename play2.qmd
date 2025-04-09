@@ -251,15 +251,15 @@ output$epicMapRSV <- renderPlotly({
       filter(date == input$selected_date & age_level == '<1 Years' & outcome_name=='RSV') %>%
       mutate(state = state.abb[match(geography, state.name)] ,
              #Note, if >20%, cap at 20 for plotting!
-           Outcome_value3= if_else(Outcome_value3>20,20, Outcome_value3)  ) %>%
+           Outcome_value2 = if_else(Outcome_value2>20,20, Outcome_value2)  ) %>%
    filter(!is.na(state)) %>%
    as.data.frame()
 
- max.val <- max(epic_ed_combo$Outcome_value3, na.rm=T)
+ max.val <- max(epic_ed_combo$Outcome_value2, na.rm=T)
 pal1 <- viridis_pal()(4)
 date.print <- input$selected_date
 
-p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value3") +
+p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value2") +
 scale_fill_gradientn(
     colors = pal1,
     values = scales::rescale(c(0, 5, 10, 15, 20)),
