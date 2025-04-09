@@ -98,11 +98,9 @@ nrevss_rsv_ts <- read_csv('./Data/plot_files/rsv_ts_nrevss_test_rsv.csv')
 
 rsv_all_indicators_state <- read_csv('./Data/plot_files/dwh_combined_plot1_long.csv')
 
-rsvnet_age <- read_csv('./Data/plot_files/h1.age_rsv_hosp.csv')
+rsvnet_age <- read_csv('./Data/plot_files/RespNet/h1.age_rsv_hosp.csv')
 
-epic_ed_age_rsv <- read_csv('./Data/plot_files/e1_age_epic_age_rsv.csv')
-
-epic_ed_combo <- read_csv('./Data/plot_files/epic_ed_combo_rsv_flu_covid.csv')
+epic_ed_combo <- read_csv('./Data/plot_files/EpicCosmos/e1_age_epic_age_rsv_flu_covid.csv')
 
 rsv_county_filled_nssp <- read_csv('./Data/plot_files/rsv_county_filled_map_nssp.csv')
 ```
@@ -147,13 +145,13 @@ rsv_ts_comp <- rsv_all_indicators_state %>%
     mutate(ds_label = if_else(outcome_label1=='Google Searches 1', 'Google 1',
            if_else(outcome_label1=='Google Searches 2', 'Google 2',
                  if_else(outcome_label1=='Pct of ED visits', 'ED visits (CDC/NSSP)',           
-                         if_else(outcome_label1=='ED (N)', 'ED visits (Epic cosmos)', 
+                         if_else(outcome_label1=='Pct of ED visits (Epic)', 'ED visits (Epic cosmos)', 
                                  if_else(outcome_label1=='Hospitalizations', 'Hospitalization Resp-Net)', outcome_label1
                                      
                    )))))
            ) %>%
     ggplot()+
-  geom_line(aes(x=date, y=outcome_3m, color=ds_label,linetype=ds_label, group=ds_label,
+  geom_line(aes(x=date, y=outcome_3m_scale, color=ds_label,linetype=ds_label, group=ds_label,
                 text=paste0(geography, "<br>", 
                             source, "<br>", 
                            outcome_label1, "<br>",
@@ -191,33 +189,15 @@ output$distPlotRSV_hosp_age <- renderPlotly({
 })
 
 
-#epic by age
-output$distPlotRSV_epic_age <- renderPlotly({
-  
-  rsv_epic_ts_comp <- epic_ed_age_rsv %>%
-    filter(geography==input$state.select3 & date >=as.Date('2023-07-01')) %>%
-    
-    ggplot()+
-    geom_line(aes(x=date, y=scale_age_epic, group_by=Level, color=Level)) +
-    theme_minimal()+
-    xlab('Date')+
-    ylab('RSV activity (Epic Cosmos)')+
-    scale_colour_viridis_d() +
-    ggtitle(paste0(input$state.select3, ' Epic Cosmos'))
-  
-  ggplotly(rsv_epic_ts_comp)
-})
-
-
 #epic ED by age
 output$distPlotRSV_epic_ED_age <- renderPlotly({
   
   
   if(input$scale.rsv==F){
   rsv_epic_ts_comp <- epic_ed_combo %>%
-    filter(geography==input$state.select3 & date >=as.Date('2023-07-01')) %>%
+    filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='RSV' & age_level !='Total') %>%
     ggplot()+
-    geom_line(aes(x=date, y=pct_RSV_ED_epic, group_by=Level, color=Level)) +
+    geom_line(aes(x=date, y=Outcome_value2, group_by=age_level, color=age_level)) +
     theme_minimal()+
     xlab('Date')+
     ylab('Percent of ED visits for RSV (Epic Cosmos)')+
@@ -228,10 +208,10 @@ output$distPlotRSV_epic_ED_age <- renderPlotly({
   
   }else{
       rsv_epic_ts_comp <- epic_ed_combo %>%
-    filter(geography==input$state.select3 & date >=as.Date('2023-07-01')) %>%
+    filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='RSV' & age_level !='Total') %>%
     
     ggplot()+
-    geom_line(aes(x=date, y=ED_epic_scale_RSV, group_by=Level, color=Level)) +
+    geom_line(aes(x=date, y=Outcome_value3, group_by=age_level, color=age_level)) +
     theme_minimal()+
     xlab('Date')+
     ylab('Rescaled ED visits for RSV (Epic Cosmos)')+
@@ -247,18 +227,18 @@ output$distPlotRSV_epic_ED_age <- renderPlotly({
 output$epicMapRSV <- renderPlotly({
 
  map_data <- epic_ed_combo %>%
-      filter(date == input$selected_date & Level == '<1 Years') %>%
+      filter(date == input$selected_date & Level == '<1 Years' & outcome_name=='RSV') %>%
       mutate(state = state.abb[match(geography, state.name)] ,
              #Note, if >20%, cap at 20 for plotting!
-           pct_RSV_ED_epic= if_else(pct_RSV_ED_epic>20,20, pct_RSV_ED_epic)  ) %>%
+           Outcome_value3= if_else(Outcome_value3>20,20, Outcome_value3)  ) %>%
    filter(!is.na(state)) %>%
    as.data.frame()
 
- max.val <- max(epic_ed_combo$pct_RSV_ED_epic, na.rm=T)
+ max.val <- max(epic_ed_combo$Outcome_value3, na.rm=T)
 pal1 <- viridis_pal()(4)
 date.print <- input$selected_date
 
-p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "pct_RSV_ED_epic") +
+p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value2") +
 scale_fill_gradientn(
     colors = pal1,
     values = scales::rescale(c(0, 5, 10, 15, 20)),

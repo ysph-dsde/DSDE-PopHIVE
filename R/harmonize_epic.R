@@ -5,7 +5,7 @@ source('./R/epic_age_import.R')
 
 #EPIC ED all cause
 epic_ed_all <-
-  epic_age_import(ds_name = "all_ED_week_age_state_sunday.csv") %>%
+  epic_age_import(ds_name = "All ED visits/07042025_AllEDvisits_State_Week_Age_2023-2025.csv") %>%
   rename(N_ED_epic_all_cause = N_cases_epic) %>%
   dplyr::select(geography, Level, date, N_ED_epic_all_cause)
 
@@ -13,9 +13,10 @@ epic_ed_all <-
 #EPIC ED RSV
 
 epic_ed_rsv <-
-  epic_age_import(ds_name = "RSV_ED_week_age_state_sunday.csv") %>%
+  epic_age_import(ds_name = "RSV/07042025_RSV_EDvisits_ICD10s_State_Week_Age_2023-2025.csv") %>%
   rename(N_ED_type = N_cases_epic) %>%
   dplyr::select(geography, Level, date, N_ED_type) %>%
+  filter(!is.na(Level)) %>%
   full_join(epic_ed_all, by = c('geography', 'Level', 'date')) %>%
   arrange(Level, geography, date) %>%
   group_by(Level, geography)  %>%
@@ -24,9 +25,10 @@ epic_ed_rsv <-
 
 # EPIC ED FLU
 epic_ed_flu <-
-  epic_age_import(ds_name = "FLU_ED_week_age_state_sunday.csv") %>%
+  epic_age_import(ds_name = "flu/07042025_FLU_EDvisits_ICD10s_State_Week_Age_2023-2025.csv", skipN = 12) %>%
   rename(N_ED_type = N_cases_epic) %>%
   dplyr::select(geography, Level, date, N_ED_type) %>%
+  filter(!is.na(Level)) %>%
   full_join(epic_ed_all, by = c('geography', 'Level', 'date')) %>%
   arrange(Level, geography, date) %>%
   group_by(Level, geography)  %>%
@@ -34,8 +36,9 @@ epic_ed_flu <-
 
 # EPIC ED COVID
 epic_ed_covid <-
-  epic_age_import(ds_name = "COVID_ED_week_age_state_sunday.csv") %>%
+  epic_age_import(ds_name = "COVID-19/07042025_COVID_EDvisits_ICD10_State_Week_Age_2023-2025.csv") %>%
   rename(N_ED_type = N_cases_epic) %>%
+  filter(!is.na(Level)) %>%
   dplyr::select(geography, Level, date, N_ED_type) %>%
   full_join(epic_ed_all, by = c('geography', 'Level', 'date')) %>%
   arrange(Level, geography, date) %>%
@@ -43,8 +46,7 @@ epic_ed_covid <-
   mutate(outcome_name = 'COVID')
 
 
-epic_ed_combo <- epic_ed_all %>%
-  bind_rows(epic_ed_rsv, epic_ed_flu , epic_ed_covid) %>%
+epic_ed_combo <- bind_rows(epic_ed_rsv, epic_ed_flu , epic_ed_covid) %>%
   filter(!is.na(Level)) %>%
   arrange(outcome_name, Level, geography, date) %>%
   group_by(outcome_name, Level, geography) %>%
@@ -59,12 +61,10 @@ epic_ed_combo <- epic_ed_all %>%
     
     pct_ED_epic = N_ED_type / N_ED_epic_all_cause * 100,
     
-    pct_ED_epic_smooth = zoo::rollmean(
-      pct_ED_epic,
-      k = 3,
-      fill = NA,
-      align = 'right'
-    ),
+    pct_ED_epic_smooth = zoo::rollapplyr(pct_ED_epic,3,mean, partial=T, na.rm=T),
+    
+    pct_ED_epic_smooth = if_else(is.nan(pct_ED_epic_smooth), NA, pct_ED_epic_smooth),
+    
     
     ED_epic_scale = 100 * pct_ED_epic_smooth / max(pct_ED_epic_smooth , na.rm =
                                                      T),
@@ -82,15 +82,17 @@ epic_ed_combo <- epic_ed_all %>%
     additional_strata1 = 'none',
     additional_strata_level = NA_character_,
     sex_strata = 'none',
-    sex_level = NA_character_
+    sex_level = NA_character_,
     
+    age_strata = if_else(Level=='Total','none',age_strata ),
+    geo_strata = if_else(geography=='Total', 'none',geo_strata )
   )  %>%
   ungroup() %>%
   rename(
-    Outcome_value1 = pct_ED_epic_smooth,
-    Outcome_value3 = pct_ED_epic,
+    Outcome_value1 = pct_ED_epic,
+    Outcome_value2 = pct_ED_epic_smooth,
+    Outcome_value3 = ED_epic_scale,
     Outcome_value4 = N_ED_type,
-    Outcome_value2 = ED_epic_scale,
     Outcome_value5 = N_ED_epic_all_cause,
     age_level = Level
   ) %>%
@@ -117,16 +119,16 @@ epic_ed_combo <- epic_ed_all %>%
     "Outcome_value5"
   ) %>%
   mutate(
-    outcome_label1 = 'Pct of ED visits (smoothed)',
-    outcome_label2 = 'Pct of ED visits (smoothed and scaled)',
-    outcome_label3 = 'Pct of ED visits',
-    outcome_label4 = 'Number of ED visits for the outcome',
-    outcome_label5 = 'Number of ED visits for any outcome'
+    outcome_label1 = 'Pct of ED visits (Epic)',
+    outcome_label2 = 'Pct of ED visits (Epic, smoothed)',
+    outcome_label3 = 'Pct of ED visits (Epic, smoothed and scaled)',
+    outcome_label4 = 'Number of ED visits for the outcome, Epic',
+    outcome_label5 = 'Number of ED visits for any outcome, Epic'
     
   )
 
 
 write_parquet(epic_ed_combo,
-              './Data/harmonized_epic_flu_rsv_covid.parquet')
+              './Data/live_files/epic_cosmos_flu_rsv_covid.parquet')
 
 #test <- read_parquet( './Data/harmonized_epic_flu_rsv_covid.parquet') %>% collect()

@@ -120,13 +120,16 @@ h1.age <- cdc_rsvnet %>%
   filter( date >=as.Date('2023-07-01')) %>%
   arrange(state, Level, date) %>%
   group_by(state, Level) %>%
-  mutate(hosp_rate_3m=zoo::rollmean(hosp_rate, k = 3, fill = NA, align='right'),
+  mutate(hosp_rate_3m=zoo::rollapplyr(hosp_rate,3,mean, partial=T, na.rm=T),
+         hosp_rate_3m = if_else(is.nan(hosp_rate_3m), NA, hosp_rate_3m),
+         
          scale_age=hosp_rate_3m/max(hosp_rate_3m, na.rm=T )*100,
+
   ) %>%
   as.data.frame()
 
 
-write.csv(h1.age,'./Data/plot_files/h1.age_rsv_hosp.csv')
+write.csv(h1.age,'./Data/plot_files/RespNet/h1.age_rsv_hosp.csv')
 
 #######################################
 ###Google searches for RSV vaccination
@@ -329,125 +332,27 @@ ww1_harmonized <- open_dataset('./Data/live_files/wastewater_rsv.parquet') %>%
 ###Epic ED for RSV
 #######################################
 
-epic_ed_virus <- open_dataset( './Data/harmonized_epic_flu_rsv_covid.parquet') %>%
+epic_ed_virus <- open_dataset( './Data/live_files/epic_cosmos_flu_rsv_covid.parquet') %>%
   collect()
 
-epic_ed_virus_all_age <- epic_ed_virus %>%
-  group_by(outcome_name, outcome_type, geography,date ) %>%
-  summarize( N_virus_pos =sum(Outcome_value4, na.rm=T), N_visits=sum(Outcome_value5, na.rm=T) )
+e1 <- epic_ed_virus %>%
+  mutate( geography= if_else(geography=='Total', 'United States', geography)) 
 
-e1 <- readr::read_csv('./Data/Epic Cosmos Data/RSVICD10week_age_state.csv', skip=15, col_names=F) %>%
-  rename(geography=X1, age=X2) %>%
-  tidyr::fill( geography, .direction = 'down') %>%
-  reshape2::melt(., id.vars=c('geography','age')) %>%
-  arrange(geography, age, variable) %>%
-  group_by(geography, age) %>%
-  #week END date
-  mutate(date= seq.Date(from=as.Date('2019-01-12'), length.out=n() , by='week')) %>%
-  ungroup() %>%
-  rename(N_cases=value) %>%
-  mutate( N_cases = if_else(N_cases=='10 or fewer',NA_character_, N_cases),
-          N_cases = as.numeric(N_cases),
-          geography= if_else(geography=='Total', 'United States', geography)) %>%
-  dplyr::select(-variable)
+e1 %>% 
+  write.csv(., './Data/plot_files/EpicCosmos/e1_age_epic_age_rsv_flu_covid.csv')
 
-e1_all_ages <- e1 %>% filter(age=='Total') %>%
-  rename(state=geography, N_epic=N_cases) 
-
-e1_age <-  e1 %>% filter(age!='Total' & geography !='United States' & age != 'No value') %>%
-  mutate( Level = if_else(age == 'Less than 1 years', '<1 Years',
-                          if_else( age=='? 1 and < 5 years','1-4 Years',
-                                   if_else(age=='? 5 and < 18 years' , "5-17 Years",
-                                           if_else( age=="? 18 and < 50 years" ,"18-49 Years" ,         
-                                                    if_else( age=="? 50 and < 65 years" , "50-64 Years" ,        
-                                                             if_else( age=="? 65 and < 75 years" ,"65-74 Years",          
-                                                                      if_else( age=="75 years or more" , "75+ Years", NA_character_         
-                                                                      ) )))))
-  )) %>%
-  dplyr::select(-age) %>%
-  ungroup() %>%
-  arrange( geography,Level, date) %>%
-  group_by( geography,Level) %>%
-  rename(N_cases_epic=N_cases) %>%
-  filter(date>='2023-07-01') %>%
-  mutate( N_cases_epic_3m=zoo::rollmean(N_cases_epic, k = 3, fill = NA, align='right'),
-          max_grp= max(N_cases_epic_3m, na.rm=T),
-          scale_age_epic = N_cases_epic_3m/max_grp*100
-  ) %>%
-  ungroup()
-
-write.csv(e1_age, './Data/plot_files/e1_age_epic_age_rsv.csv')
-
-epic_rsv_aggregate_harmonized <- e1_all_ages %>%
-  rename(Outcome_value1=N_epic,
-         geography=state) %>%
-  mutate(outcome_type='ED',
-         outcome_label1 = 'ED (N)',
-         domain = 'Respiratory infections',
-         date_resolution = 'week',
-         update_frequency = 'weekly',
-         source = 'Epic Cosmos',
-         url = 'https://www.epicresearch.org/',
-         geo_strata = 'state',
-         age_strata = 'none',
-         race_strata = 'none',
-         race_level = NA_character_,
-         additional_strata1 = 'none',
-         additional_strata_level = NA_character_,
-         sex_strata = 'none',
-         sex_level = NA_character_)
-
-
-#EPIC ED all cause
-epic_ed_all <- epic_age_import(ds_name="all_ED_week_age_state_sunday.csv" ) %>%
-  rename(N_ED_epic= N_cases_epic
-  ) %>%
-  dplyr::select(geography,Level, date,N_ED_epic)
-
-epic_ed_rsv <- epic_age_import(ds_name="RSV_ED_week_age_state_sunday.csv" ) %>%
-  rename( N_RSV_ED_epic= N_cases_epic) %>%
-  dplyr::select(geography,Level, date,N_RSV_ED_epic)
-
-epic_ed_flu <- epic_age_import(ds_name="FLU_ED_week_age_state_sunday.csv" ) %>%
-  rename( N_flu_ED_epic= N_cases_epic) %>%
-  dplyr::select(geography,Level, date,N_flu_ED_epic)
-
-epic_ed_covid <- epic_age_import(ds_name="COVID_ED_week_age_state_sunday.csv" ) %>%
-  rename( N_covid_ED_epic= N_cases_epic) %>%
-  dplyr::select(geography,Level, date,N_covid_ED_epic)
-
-epic_ed_combo <- epic_ed_all %>%
-  left_join(epic_ed_rsv, by=c('geography','Level', 'date')) %>%
-  left_join(epic_ed_flu, by=c('geography','Level', 'date')) %>%
-  left_join(epic_ed_covid, by=c('geography','Level', 'date')) %>%
-  arrange(Level, geography, date) %>%
-  group_by(Level, geography) %>%
-  mutate(pct_RSV_ED_epic =N_RSV_ED_epic/N_ED_epic*100,
-         pct_flu_ED_epic =N_flu_ED_epic/N_ED_epic*100,
-         pct_covid_ED_epic =N_covid_ED_epic/N_ED_epic*100,
-         
-         pct_RSV_ED_epic = zoo::rollmean(pct_RSV_ED_epic, k = 3, fill = NA, align='right'),
-         pct_flu_ED_epic = zoo::rollmean(pct_flu_ED_epic, k = 3, fill = NA, align='right'),
-         pct_covid_ED_epic = zoo::rollmean(pct_covid_ED_epic, k = 3, fill = NA, align='right'),
-         
-         ED_epic_scale_RSV= 100*pct_RSV_ED_epic/max(pct_RSV_ED_epic,na.rm=T),
-         ED_epic_scale_flu= 100*pct_flu_ED_epic/max(pct_flu_ED_epic,na.rm=T),
-         ED_epic_scale_covid= 100*pct_covid_ED_epic/max(pct_covid_ED_epic,na.rm=T),
-  )
-
-
-write.csv(epic_ed_combo, './Data/plot_files/epic_ed_combo_rsv_flu_covid.csv')
 
 
 #######################
 ###Combined file for overlaid time series RSV figure
 
-dwh <- bind_rows(nssp_harmonized, ww1_harmonized,h1_harmonized,epic_rsv_aggregate_harmonized,g1_state_harmonized_v1, g1_state_harmonized_v2) %>%
-  filter(date >=as.Date('2023-07-01')) %>%
+dwh <- bind_rows(nssp_harmonized, ww1_harmonized,h1_harmonized,e1,g1_state_harmonized_v1, g1_state_harmonized_v2) %>%
+  filter(date >=as.Date('2023-07-01') & age_strata=='none' & !outcome_name %in% c('FLU','COVID')) %>%
   arrange(geography, outcome_label1,source,date) %>%
   group_by(geography,outcome_label1, source) %>%
   filter(date>='2023-07-01') %>%
-  mutate(outcome_3m = zoo::rollmean(Outcome_value1, k = 3, fill = NA, align='right'),
+  mutate(outcome_3m = zoo::rollapplyr(Outcome_value1,3,mean, partial=T, na.rm=T),
+         outcome_3m = if_else(is.nan(outcome_3m), NA, outcome_3m),
          outcome_3m_scale = outcome_3m / max(outcome_3m, na.rm=T)*100
   )
 
