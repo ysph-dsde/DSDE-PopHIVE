@@ -248,7 +248,7 @@ output$distPlotRSV_epic_ED_age <- renderPlotly({
 output$epicMapRSV <- renderPlotly({
 
  map_data <- epic_ed_combo %>%
-      filter(date == input$selected_date & Level == '<1 Years' & outcome_name=='RSV') %>%
+      filter(date == input$selected_date & age_level == '<1 Years' & outcome_name=='RSV') %>%
       mutate(state = state.abb[match(geography, state.name)] ,
              #Note, if >20%, cap at 20 for plotting!
            Outcome_value3= if_else(Outcome_value3>20,20, Outcome_value3)  ) %>%
@@ -259,7 +259,7 @@ output$epicMapRSV <- renderPlotly({
 pal1 <- viridis_pal()(4)
 date.print <- input$selected_date
 
-p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value2") +
+p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value3") +
 scale_fill_gradientn(
     colors = pal1,
     values = scales::rescale(c(0, 5, 10, 15, 20)),
@@ -436,7 +436,7 @@ output$distPlotflu_epic_ED_age <- renderPlotly({
   
   if(input$scale.flu==F){
   flu_epic_ts_comp <- epic_ed_combo %>%
-    filter(geography==input$state.select4 & date >=as.Date('2023-07-01') & outcome_name=='FLU') %>%
+    filter(geography==input$state.select4 & date >=as.Date('2023-07-01') & outcome_name=='FLU' & age_level !='Total') %>%
     
     ggplot()+
     geom_line(aes(x=date, y=Outcome_value2, group_by=age_level, color=age_level)) +
@@ -449,7 +449,7 @@ output$distPlotflu_epic_ED_age <- renderPlotly({
   ggplotly(flu_epic_ts_comp)
   }else{
       flu_epic_ts_comp <- epic_ed_combo %>%
-    filter(geography==input$state.select4 & date >=as.Date('2023-07-01') & outcome_name=='FLU') %>%
+    filter(geography==input$state.select4 & date >=as.Date('2023-07-01') & outcome_name=='FLU' & age_level !='Total') %>%
     
     ggplot()+
     geom_line(aes(x=date, y=Outcome_value3, group_by=age_level, color=age_level)) +
@@ -504,7 +504,7 @@ output$distPlotcovid_epic_ED_age <- renderPlotly({
   
   if(input$scale.covid==F){
   covid_epic_ts_comp <- epic_ed_combo %>%
-    filter(geography==input$state.select5 & date >=as.Date('2023-07-01') & outcome_name=="COVID") %>%
+    filter(geography==input$state.select5 & date >=as.Date('2023-07-01') & outcome_name=="COVID" & age_level !='Total') %>%
     
     ggplot()+
     geom_line(aes(x=date, y=Outcome_value2, group_by=age_level, color=age_level)) +
@@ -517,7 +517,7 @@ output$distPlotcovid_epic_ED_age <- renderPlotly({
   ggplotly(covid_epic_ts_comp)
   }else{
       covid_epic_ts_comp <- epic_ed_combo %>%
-    filter(geography==input$state.select5 & date >=as.Date('2023-07-01') & outcome_name=="COVID") %>%
+    filter(geography==input$state.select5 & date >=as.Date('2023-07-01') & outcome_name=="COVID" & age_level !='Total') %>%
     
     ggplot()+
     geom_line(aes(x=date, y=Outcome_value3, group_by=age_level, color=age_level)) +
