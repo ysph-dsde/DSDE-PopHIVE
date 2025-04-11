@@ -174,3 +174,88 @@ mostRecentTimestamp <- function(fname, basepath='.') {
   
   max(mtimes)
 }
+
+###################################################
+
+#Return the date and file name of most recent file
+
+datetimeStamp <- function( basepath=".", goalDate = lubridate::now()) {
+  # Previously was mostRecentTimestamp() and retrievePath() used by retrieveRDS().
+  # 
+  #  "basepath": path location following the getwd() result.
+  # 
+  # This function lists all of the dates a source was archived, and will
+  # summarize the most recently received archive per source type detected.
+  
+  # Confirm that "goalDate" is a Date object.
+  assertthat::assert_that(any("POSIXct" %in% class(goalDate)))
+  
+  
+  # Construct the path to the folder where all copies of "storeName" are stored.
+  fullpath <- file.path(basepath)
+  
+  # Confirm directory at the provided path exists.
+  if (!dir.exists(fullpath)){
+    stop(sprintf("Path '%s' doesn't exist, or isn't a directory", fullpath))
+  }
+  
+  
+  # Get all the files in this directory.
+  dirListing <- list.files(fullpath)
+  
+  # If there were no files in the directory, throw an error.
+  if (length(dirListing) == 0){
+    stop(sprintf("No files were found in dirctory '%s'", fullpath))
+  }
+  
+  
+  # For each source available, draw out the most recent time stamp recorded.
+  # 
+  # The original code was drawing the time information from the file metadata 
+  # as opposed to the name. This script instead pulls that information from the
+  # file name itself. It also keeps some details about the source type, which is
+  # user provided. Notice this assumes files are stored 
+  # "source_name_%Y_%m_%d_%H_%M.parquet", as used in storeRDS().
+  
+  # Assuming the time-stamp elements are the same, pull everything preceding
+  # as the "source name" details.
+  source <- str_replace(dirListing, "_[0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{2}_[0-9]{2}.parquet", "")
+  
+  ##Extract the date from the file name
+  
+  extract_date <- function(filename) {
+    # Use a regular expression to extract the date in YYYY_MM_DD format
+    match <- regmatches(filename, regexpr("\\d{4}_\\d{2}_\\d{2}", filename))
+    # Convert to Date format
+    as.Date(match, format = "%Y_%m_%d")
+  }
+  
+  #extract_date(all_dates)
+  
+  file_date <- extract_date(source)
+  
+  all_files <- data.frame("Source" = source, 
+                          "History" = file_date,
+                          "filePath" = dirListing)
+  
+  # From the dates, save the most recently represented data pull for each source, 
+  # according to the file name time stamp. Also find the file for each source that 
+  # has the minimum time interval between the time stamp and goalDate (Delta).
+  
+  relative_reports <- all_files %>%
+    group_by(Source) %>%
+    # Calculate the difference between the time stamp and goalDate.
+    mutate(Delta = abs( purrr::map_dbl(History, ~lubridate::int_length(. %--% goalDate)) )/(60*60*24)  ) %>%
+    # Store only the min Delta and max History.
+    filter(History == max(History)|Delta == min(Delta)) %>%
+    # Label the filtered rows by which condition it met, including a condition that
+    # denotes if a row met both recent pull and min delta conditions.
+    mutate("Status" = ifelse(History == max(History), "Recent Pull", "Min Delta")) %>%
+    mutate("Status" = ifelse(Delta == min(Delta) & History == max(History), "Both", Status)) %>%
+    ungroup() %>%
+    as.data.frame()
+  
+  # Report the results.
+  list("Record History" = all_dates, "Report Relative to Date" = relative_reports)
+  
+}
