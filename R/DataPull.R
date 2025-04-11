@@ -4,8 +4,7 @@ library(parquetize)
 library(arrow)
 library(MMWRweek)
 
-
-source('./R/runIfExpired.R') #function for archiving
+source('./R/archiving_functions.R') #function for archiving
 source('./R/epic_age_import.R')
 source('./R/harmonize_epic.R')
 
@@ -21,14 +20,11 @@ source('./R/harmonize_epic.R')
 #######################################
 url_nssp <- "https://data.cdc.gov/resource/rdmq-nq56.csv"
 
-cdc_nssp_ed1 <- runIfExpired('nssp_ed1',
-                    ~ read.socrata(url_nssp),maxage=hours(24*7)
+cdc_nssp_rsv_flu_covid_ed1 <- runIfExpired(source='nssp_ed1',storeIn='Raw',  basepath='./Data/Archive',
+                                           f=~ read.socrata(url_nssp),tolerance=(24*7)
 )
 
-verify_update(  test_file = cdc_nssp_ed1, ds_path='./Data/nssp_ed1/') %>%
-  write_parquet('./Data/live_files/nssp_rsv_county.parquet')
-
-nssp_harmonized <- open_dataset('./Data/live_files/nssp_rsv_county.parquet') %>%
+nssp_harmonized_rsv <- cdc_nssp_rsv_flu_covid_ed1 %>%
   filter(county=='All'  ) %>%
   rename(state=geography, date='week_end') %>%
   dplyr::select(state, date, percent_visits_rsv) %>%
@@ -38,7 +34,55 @@ nssp_harmonized <- open_dataset('./Data/live_files/nssp_rsv_county.parquet') %>%
          geography=state) %>%
   mutate(outcome_type='ED',
          outcome_label1 = 'Pct of ED visits',
-         domain = 'Respiratory infections',
+         domain = 'Respiratory infections (RSV)',
+         date_resolution = 'week',
+         update_frequency = 'weekly',
+         source = 'CDC NSSP',
+         url = 'https://healthdata.gov/dataset/NSSP-Emergency-Department-Visit-Trajectories-by-St/hr4c-e7p6/',
+         geo_strata = 'state',
+         age_strata = 'none',
+         race_strata = 'none',
+         race_level = NA_character_,
+         additional_strata1 = 'none',
+         additional_strata_level = NA_character_,
+         sex_strata = 'none',
+         sex_level = NA_character_)
+
+nssp_harmonized_flu <- cdc_nssp_rsv_flu_covid_ed1 %>%
+  filter(county=='All'  ) %>%
+  rename(state=geography, date='week_end') %>%
+  dplyr::select(state, date, percent_visits_influenza) %>%
+  collect() %>%
+  as.data.frame() %>%
+  rename(Outcome_value1=percent_visits_influenza,
+         geography=state) %>%
+  mutate(outcome_type='ED',
+         outcome_label1 = 'Pct of ED visits',
+         domain = 'Respiratory infections (flu)',
+         date_resolution = 'week',
+         update_frequency = 'weekly',
+         source = 'CDC NSSP',
+         url = 'https://healthdata.gov/dataset/NSSP-Emergency-Department-Visit-Trajectories-by-St/hr4c-e7p6/',
+         geo_strata = 'state',
+         age_strata = 'none',
+         race_strata = 'none',
+         race_level = NA_character_,
+         additional_strata1 = 'none',
+         additional_strata_level = NA_character_,
+         sex_strata = 'none',
+         sex_level = NA_character_)
+
+nssp_harmonized_covid <- cdc_nssp_rsv_flu_covid_ed1 %>%
+  filter(county=='All'  ) %>%
+  rename(state=geography, date='week_end') %>%
+  dplyr::select(state, date, percent_visits_covid) %>%
+  collect() %>%
+  as.data.frame() %>%
+  rename(Outcome_value1=percent_visits_covid,
+         geography=state) %>%
+  mutate(outcome_type='ED',
+         outcome_label1 = 'Pct of ED visits',
+         domain = 'Respiratory infections (flu)',
          date_resolution = 'week',
          update_frequency = 'weekly',
          source = 'CDC NSSP',
@@ -57,15 +101,13 @@ nssp_harmonized <- open_dataset('./Data/live_files/nssp_rsv_county.parquet') %>%
 #######################################
 url_resp_net <- "https://data.cdc.gov/resource/kvib-3txy.csv"
 
-cdc_respnet <- runIfExpired('respnet',
-                             ~ read.socrata(url_resp_net),maxage=hours(24*7)
+cdc_respnet <- runIfExpired(source='respnet',storeIn='Raw',  basepath='./Data/Archive',
+                            ~ read.socrata(url_resp_net),tolerance=(24*7)
 )
 
-current_data = verify_update(  test_file = cdc_respnet, ds_path='./Data/respnet/') %>%
-  write_parquet('./Data/live_files/respnet_hosp.parquet')
-
-h1_harmonized <- open_dataset('./Data/live_files/respnet_hosp.parquet') %>%
-  filter( site != 'Overall' & surveillance_network=='RSV-NET' & type=='Unadjusted Rate' & age_group=='Overall' &
+h1_harmonized_rsv <- cdc_respnet %>%
+  filter( site != 'Overall' & 
+            surveillance_network=='RSV-NET' & type=='Unadjusted Rate' & age_group=='Overall' &
             sex=='Overall' & race_ethnicity=='Overall') %>%
   rename(state=site, hosp_rate=weekly_rate, date=X_weekenddate) %>%
   mutate(date=as.Date(substr(date,1,10)) ) %>%
@@ -89,31 +131,80 @@ h1_harmonized <- open_dataset('./Data/live_files/respnet_hosp.parquet') %>%
          sex_strata = 'none',
          sex_level = NA_character_)
 
+h1_harmonized_flu <- cdc_respnet %>%
+  filter( site != 'Overall' & 
+            surveillance_network=='FluSurv-NET' & type=='Unadjusted Rate' & age_group=='Overall' &
+            sex=='Overall' & race_ethnicity=='Overall') %>%
+  rename(state=site, hosp_rate=weekly_rate, date=X_weekenddate) %>%
+  mutate(date=as.Date(substr(date,1,10)) ) %>%
+  dplyr::select(state, date, hosp_rate) %>%
+  as.data.frame() %>% 
+  rename(Outcome_value1=hosp_rate,
+         geography=state) %>%
+  mutate(outcome_type='Inpatient Hospitalization',
+         outcome_label1 = 'Hospitalization Rate',
+         domain = 'Respiratory infections',
+         date_resolution = 'week',
+         update_frequency = 'weekly',
+         source = 'CDC FluSurv-NET',
+         url = 'https://data.cdc.gov/resource/kvib-3txy.csv',
+         geo_strata = 'state',
+         age_strata = 'none',
+         race_strata = 'none',
+         race_level = NA_character_,
+         additional_strata1 = 'none',
+         additional_strata_level = NA_character_,
+         sex_strata = 'none',
+         sex_level = NA_character_)
+
+h1_harmonized_covid <- cdc_respnet %>%
+  filter( site != 'Overall' & 
+            surveillance_network=='COVID-NET' & type=='Unadjusted Rate' & age_group=='Overall' &
+            sex=='Overall' & race_ethnicity=='Overall') %>%
+  rename(state=site, hosp_rate=weekly_rate, date=X_weekenddate) %>%
+  mutate(date=as.Date(substr(date,1,10)) ) %>%
+  dplyr::select(state, date, hosp_rate) %>%
+  as.data.frame() %>% 
+  rename(Outcome_value1=hosp_rate,
+         geography=state) %>%
+  mutate(outcome_type='Inpatient Hospitalization',
+         outcome_label1 = 'Hospitalization Rate',
+         domain = 'Respiratory infections',
+         date_resolution = 'week',
+         update_frequency = 'weekly',
+         source = 'CDC COVID-NET',
+         url = 'https://data.cdc.gov/resource/kvib-3txy.csv',
+         geo_strata = 'state',
+         age_strata = 'none',
+         race_strata = 'none',
+         race_level = NA_character_,
+         additional_strata1 = 'none',
+         additional_strata_level = NA_character_,
+         sex_strata = 'none',
+         sex_level = NA_character_)
+
 #######################################
 ###RSVNet (CDC) by week, state, age, etc
 #######################################
 url_rsv_net <- "https://data.cdc.gov/resource/29hc-w46k.csv"
 
-cdc_rsvnet <- runIfExpired('rsvnet',
-                            ~ read.socrata(url_rsv_net),maxage=hours(24*7)
+cdc_rsvnet <- runIfExpired(source='rsvnet',storeIn='Raw',  basepath='./Data/Archive',
+                           ~ read.socrata(url_rsv_net),tolerance=(24*7)
 )
 
-verify_update(  test_file = cdc_rsvnet, ds_path='./Data/rsvnet/') %>%
-  write_parquet('./Data/live_files/rsvnet_hosp.parquet')
 
-
-h1.age <- cdc_rsvnet %>%
+h1.age.rsv <- cdc_rsvnet %>%
   filter(state!="RSV-NET" & sex=='All' & race=='All' & type=='Crude Rate') %>%
   rename( hosp_rate=rate, date=week_ending_date, Level=age_category) %>%
   filter(Level %in% c('1-4 years', '0-<1 year','5-17 years', '18-49 years' ,
                       "≥65 years" ,"50-64 years" )) %>%
   mutate( Level = if_else(Level=='0-<1 year',"<1 Years",
                           if_else( Level=='1-4 years', "1-4 Years",
-                          if_else(Level=="5-17 years" ,"5-17 Years",
-                          if_else(Level=="18-49 years" ,"18-49 Years",
-                          if_else(Level=="50-64 years" ,"50-64 Years",
-                           if_else(Level=="≥65 years",'65+ Years', 'other'               
-                                  ))))))
+                                   if_else(Level=="5-17 years" ,"5-17 Years",
+                                           if_else(Level=="18-49 years" ,"18-49 Years",
+                                                   if_else(Level=="50-64 years" ,"50-64 Years",
+                                                           if_else(Level=="≥65 years",'65+ Years', 'other'               
+                                                           ))))))
   ) %>%
   dplyr::select(state, date, hosp_rate, Level) %>%
   ungroup() %>%
@@ -124,12 +215,13 @@ h1.age <- cdc_rsvnet %>%
          hosp_rate_3m = if_else(is.nan(hosp_rate_3m), NA, hosp_rate_3m),
          
          scale_age=hosp_rate_3m/max(hosp_rate_3m, na.rm=T )*100,
-
+         
   ) %>%
   as.data.frame()
 
+write.csv(h1.age.rsv,'./Data/plot_files/rsv_hosp_age_respnet.csv')
 
-write.csv(h1.age,'./Data/plot_files/RespNet/h1.age_rsv_hosp.csv')
+
 
 #######################################
 ###Google searches for RSV vaccination
@@ -141,13 +233,13 @@ url2 <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/da
 temp_file2 <- tempfile(fileext = ".parquet")
 download.file(url2, temp_file2, mode = "wb")
 
-google_rsv_vax <- runIfExpired('google_rsv_vax',
-                            ~ read_parquet(temp_file2),
-                            maxage=hours(24*7)
+google_rsv_vax <- runIfExpired(source='google_rsv_vax', storeIn='Raw',  basepath='./Data/Archive',
+                               ~ read_parquet(temp_file2),
+                               tolerance=(24*7)
 )
 
 g1_vax_state <- google_rsv_vax %>%
-  collect() %>%
+  filter( location %in% g_states ) %>%
   mutate(date=as.Date(date),
          date = as.Date(ceiling_date(date, 'week'))-1,
          stateabb= gsub('US-','', location),
@@ -157,7 +249,8 @@ g1_vax_state <- google_rsv_vax %>%
   dplyr::select(state, date, search_volume_vax) %>%
   distinct() %>%
   filter(date>='2014-01-01') %>%
-  write_parquet('./Data/live_files/google_rsv_vax.parquet')
+  group_by(state,date) %>%
+  summarize(search_volume_vax=mean(search_volume_vax, na.rm=T))
 
 #######################################
 ###Google searches for 'RSV' 
@@ -167,14 +260,13 @@ url1 <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/da
 temp_file1 <- tempfile(fileext = ".parquet")
 download.file(url1, temp_file1, mode = "wb")
 
-google_rsv <- runIfExpired('google_rsv',
-                               ~ read_parquet(temp_file1),
-                               maxage=hours(24*7)
+google_rsv <- runIfExpired(source='google_rsv',storeIn='Raw',  basepath='./Data/Archive',
+                           ~ read_parquet(temp_file1),
+                           tolerance=(24*7)
 )
 
-current_data = verify_update(test_file = google_rsv, ds_path='./Data/google_rsv/') %>%
+google_merged_rsv = google_rsv %>%
   filter(location %in% g_states) %>%
-  collect() %>%
   mutate(date=as.Date(date),
          date = as.Date(ceiling_date(date, 'week'))-1,
          stateabb= gsub('US-','', location),
@@ -182,7 +274,8 @@ current_data = verify_update(test_file = google_rsv, ds_path='./Data/google_rsv/
          value=round(value,2)) %>%
   rename(search_volume=value) %>%
   dplyr::select(state, date, search_volume) %>%
-  distinct() %>%
+  group_by(state,date) %>%
+  summarize(search_volume=mean(search_volume, na.rm=T)) %>%
   filter(date>='2014-01-01') %>%
   full_join(g1_vax_state, by=c('state', 'date') ) %>%
   mutate(month=month(date),
@@ -194,11 +287,9 @@ current_data = verify_update(test_file = google_rsv, ds_path='./Data/google_rsv/
          rsv_novax2 = rsv_novax2 / max(rsv_novax2, na.rm=T),
          search_volume = search_volume/ max(search_volume, na.rm=T),
          search_volume_vax = search_volume_vax/ max(search_volume_vax, na.rm=T)
-           ) %>%
-  write_parquet('./Data/live_files/google_rsv.parquet')
+  ) 
 
-
-g1_state_harmonized_v1 <- open_dataset('./Data/live_files/google_rsv.parquet') %>%
+g1_state_harmonized_v1 <- google_merged_rsv %>%
   rename(Outcome_value1=rsv_novax,
          geography=state) %>%
   mutate(outcome_type='Google Searches',
@@ -215,12 +306,10 @@ g1_state_harmonized_v1 <- open_dataset('./Data/live_files/google_rsv.parquet') %
          additional_strata1 = 'none',
          additional_strata_level = NA_character_,
          sex_strata = 'none',
-         sex_level = NA_character_) %>%
-  collect() 
-  
+         sex_level = NA_character_) 
 
 
-g1_state_harmonized_v2 <- open_dataset('./Data/live_files/google_rsv.parquet') %>%
+g1_state_harmonized_v2 <- google_merged_rsv %>%
   rename(Outcome_value1=rsv_novax2,
          geography=state) %>%
   mutate(outcome_type='Google Searches',
@@ -237,8 +326,7 @@ g1_state_harmonized_v2 <- open_dataset('./Data/live_files/google_rsv.parquet') %
          additional_strata1 = 'none',
          additional_strata_level = NA_character_,
          sex_strata = 'none',
-         sex_level = NA_character_) %>%
-  collect()
+         sex_level = NA_character_) 
 
 #od1 <- lme4::lmer(search_volume~ 1 + season*search_volume_vax +  (1|state), data=g1_state[g1_state$date>=as.Date('2023-07-01'),])
 # coef.vax <- summary(mod1)$coefficients['search_volume_vax','Estimate']
@@ -249,18 +337,14 @@ g1_state_harmonized_v2 <- open_dataset('./Data/live_files/google_rsv.parquet') %
 
 url_nrevss_rsv <- "https://data.cdc.gov/resource/3cxc-4k8q.csv"
 
-cdc_nrevss_rsv <- runIfExpired('nrevss_rsv',
-                             ~ read.socrata(url_nrevss_rsv),maxage=hours(24*7)
+cdc_nrevss_rsv <- runIfExpired(source='nrevss_rsv',storeIn='Raw',  basepath='./Data/Archive',
+                               ~ read.socrata(url_nrevss_rsv),tolerance=(24*7)
 )
 
-verify_update(  test_file = cdc_nrevss_rsv, ds_path='./Data/nrevss_rsv/') %>%
-  filter(posted==max(posted)) %>%
-  write_parquet('./Data/live_files/nrevss_rsv.parquet')
 
-key <- readRDS('./Data/hhs_regions.rds')
+key <- readRDS('./Data/other_data/hhs_regions.rds')
 
-rsv1_tests <- open_dataset('./Data/live_files/nrevss_rsv.parquet') %>%
-  collect() %>%
+rsv1_tests <- cdc_nrevss_rsv %>%
   as.data.frame()
 
 rsv_ts <- rsv1_tests %>%
@@ -294,14 +378,12 @@ write.csv(rsv_ts,'./Data/plot_files/rsv_ts_nrevss_test_rsv.csv')
 
 url_ww_rsv <- "https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/RSVStateLevelDownloadCSV.csv"
 
-cdc_ww_rsv <- runIfExpired('wastewater_rsv',
-                               ~ read_csv(url_ww_rsv),maxage=hours(24*7)
+cdc_ww_rsv <- runIfExpired(source='wastewater_rsv',storeIn='Raw',  basepath='./Data/Archive',
+                           ~ read_csv(url_ww_rsv),tolerance=(24*7)
 )
 
-verify_update(  test_file = cdc_ww_rsv, ds_path='./Data/wastewater_rsv/') %>%
-  write_parquet('./Data/live_files/wastewater_rsv.parquet')
 
-ww1_harmonized <- open_dataset('./Data/live_files/wastewater_rsv.parquet') %>%
+ww1_rsv_harmonized <- cdc_ww_rsv%>%
   mutate(date=as.Date(Week_Ending_Date)) %>%
   filter(Data_Collection_Period=='All Results') %>%
   rename(state="State/Territory", rsv_ww="State/Territory_WVAL") %>%
@@ -327,27 +409,95 @@ ww1_harmonized <- open_dataset('./Data/live_files/wastewater_rsv.parquet') %>%
          sex_strata = 'none',
          sex_level = NA_character_) 
 
+##same for flu A
+url_ww_flu <- "https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/FluA/FluAStateMapDownloadCSV.csv"
+
+cdc_ww_flu <- runIfExpired(source='wastewater_flu_a',storeIn='Raw',  basepath='./Data/Archive',
+                           ~ read_csv(url_ww_flu),tolerance=(24*7)
+)
+
+
+ww1_flu_harmonized <- cdc_ww_flu %>%
+  mutate(date=as.Date(Week_Ending_Date)) %>%
+  filter(Data_Collection_Period=='All Results') %>%
+  rename(state="State/Territory", flu_ww="State/Territory_WVAL") %>%
+  arrange(state, date) %>%
+  dplyr::select(state, date, flu_ww) %>%
+  arrange(state, date) %>%
+  collect() %>%
+  rename(Outcome_value1=flu_ww,
+         geography=state) %>%
+  mutate(outcome_type='WasteWater',
+         outcome_label1 = 'Waste Water (flu)',
+         domain = 'Respiratory infections',
+         date_resolution = 'week',
+         update_frequency = 'weekly',
+         source = 'CDC NWWS',
+         url = 'https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/FluA/FluAStateMapDownloadCSV.csv',
+         geo_strata = 'state',
+         age_strata = 'none',
+         race_strata = 'none',
+         race_level = NA_character_,
+         additional_strata1 = 'none',
+         additional_strata_level = NA_character_,
+         sex_strata = 'none',
+         sex_level = NA_character_) 
+
+##same for covid
+url_ww_covid <- "https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/SC2StateLevelDownloadCSV.csv"
+
+cdc_ww_covid <- runIfExpired(source='wastewater_covid',storeIn='Raw',  basepath='./Data/Archive',
+                             ~ read_csv(url_ww_flu),tolerance=(24*7)
+)
+
+
+ww1_covid_harmonized <- cdc_ww_covid %>%
+  mutate(date=as.Date(Week_Ending_Date)) %>%
+  filter(Data_Collection_Period=='All Results') %>%
+  rename(state="State/Territory", covid_ww="State/Territory_WVAL") %>%
+  arrange(state, date) %>%
+  dplyr::select(state, date, covid_ww) %>%
+  arrange(state, date) %>%
+  collect() %>%
+  rename(Outcome_value1=covid_ww,
+         geography=state) %>%
+  mutate(outcome_type='WasteWater',
+         outcome_label1 = 'Waste Water (covid)',
+         domain = 'Respiratory infections',
+         date_resolution = 'week',
+         update_frequency = 'weekly',
+         source = 'CDC NWWS',
+         url = 'https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/SC2StateLevelDownloadCSV.csv',
+         geo_strata = 'state',
+         age_strata = 'none',
+         race_strata = 'none',
+         race_level = NA_character_,
+         additional_strata1 = 'none',
+         additional_strata_level = NA_character_,
+         sex_strata = 'none',
+         sex_level = NA_character_) 
+
 
 #######################################
 ###Epic ED for RSV
 #######################################
 
-epic_ed_virus <- open_dataset( './Data/live_files/epic_cosmos_flu_rsv_covid.parquet') %>%
+epic_ed_rsv_flu_covid <- open_dataset( './Data/Archive/Cosmos ED/flu_rsv_covid_epic_cosmos_ed.parquet') %>%
   collect()
 
-e1 <- epic_ed_virus %>%
+e1 <- epic_ed_rsv_flu_covid %>%
   mutate( geography= if_else(geography=='Total', 'United States', geography)
-)
+  )
 
 e1 %>% 
-  write.csv(., './Data/plot_files/EpicCosmos/e1_age_epic_age_rsv_flu_covid.csv')
+  write.csv(., './Data/plot_files/rsv_flu_covid_epic_cosmos_age_state.csv')
 
 
 
 #######################
 ###Combined file for overlaid time series RSV figure
 
-dwh <- bind_rows(nssp_harmonized, ww1_harmonized,h1_harmonized,e1,g1_state_harmonized_v1, g1_state_harmonized_v2) %>%
+combined_file_rsv <- bind_rows(nssp_harmonized_rsv, ww1_rsv_harmonized,h1_harmonized_rsv,e1,g1_state_harmonized_v1, g1_state_harmonized_v2) %>%
   filter(date >=as.Date('2023-07-01') & age_strata=='none' & !outcome_name %in% c('FLU','COVID')) %>%
   arrange(geography, outcome_label1,source,date) %>%
   group_by(geography,outcome_label1, source) %>%
@@ -357,18 +507,68 @@ dwh <- bind_rows(nssp_harmonized, ww1_harmonized,h1_harmonized,e1,g1_state_harmo
          outcome_3m_scale = outcome_3m / max(outcome_3m, na.rm=T)*100
   )
 
-dates2 <- MMWRweek(as.Date(dwh$date))
+dates2 <- MMWRweek(as.Date(combined_file_rsv$date))
 
 max.wk.yr <- max(dates2$MMWRweek[dates2$MMWRyear==max(dates2$MMWRyear)])
 
-dwh <- cbind.data.frame(dwh,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
+combined_file_rsv <- cbind.data.frame(combined_file_rsv,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
   mutate( epiyr = MMWRyear, 
           epiyr = if_else(MMWRweek<=26,MMWRyear - 1 ,MMWRyear),
           epiwk  = if_else( MMWRweek<=26, MMWRweek+52, MMWRweek  ),
           epiwk=epiwk-26
   )
 
-write.csv(dwh,'./Data/plot_files/dwh_combined_plot1_long.csv')
+write.csv(combined_file_rsv,'./Data/plot_files/rsv_combined_all_outcomes_state.csv')
+
+## Same for flu
+
+combined_file_flu <- bind_rows(nssp_harmonized_flu, ww1_flu_harmonized,h1_harmonized_flu,e1) %>%
+  filter(date >=as.Date('2023-07-01') & age_strata=='none' & !outcome_name %in% c('COVID','RSV')) %>%
+  arrange(geography, outcome_label1,source,date) %>%
+  group_by(geography,outcome_label1, source) %>%
+  filter(date>='2023-07-01') %>%
+  mutate(outcome_3m = zoo::rollapplyr(Outcome_value1,3,mean, partial=T, na.rm=T),
+         outcome_3m = if_else(is.nan(outcome_3m), NA, outcome_3m),
+         outcome_3m_scale = outcome_3m / max(outcome_3m, na.rm=T)*100
+  )
+
+dates2 <- MMWRweek(as.Date(combined_file_flu$date))
+
+max.wk.yr <- max(dates2$MMWRweek[dates2$MMWRyear==max(dates2$MMWRyear)])
+
+combined_file_flu <- cbind.data.frame(combined_file_flu,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
+  mutate( epiyr = MMWRyear, 
+          epiyr = if_else(MMWRweek<=26,MMWRyear - 1 ,MMWRyear),
+          epiwk  = if_else( MMWRweek<=26, MMWRweek+52, MMWRweek  ),
+          epiwk=epiwk-26
+  )
+
+write.csv(combined_file_flu,'./Data/plot_files/flu_combined_all_outcomes_state.csv')
+
+## Same for covid
+
+combined_file_covid <- bind_rows(nssp_harmonized_covid, ww1_covid_harmonized,h1_harmonized_covid,e1) %>%
+  filter(date >=as.Date('2023-07-01') & age_strata=='none' & !outcome_name %in% c('FLU','RSV')) %>%
+  arrange(geography, outcome_label1,source,date) %>%
+  group_by(geography,outcome_label1, source) %>%
+  filter(date>='2023-07-01') %>%
+  mutate(outcome_3m = zoo::rollapplyr(Outcome_value1,3,mean, partial=T, na.rm=T),
+         outcome_3m = if_else(is.nan(outcome_3m), NA, outcome_3m),
+         outcome_3m_scale = outcome_3m / max(outcome_3m, na.rm=T)*100
+  )
+
+dates2 <- MMWRweek(as.Date(combined_file_covid$date))
+
+max.wk.yr <- max(dates2$MMWRweek[dates2$MMWRyear==max(dates2$MMWRyear)])
+
+combined_file_covid <- cbind.data.frame(combined_file_covid,dates2[,c('MMWRyear', 'MMWRweek')]) %>%
+  mutate( epiyr = MMWRyear, 
+          epiyr = if_else(MMWRweek<=26,MMWRyear - 1 ,MMWRyear),
+          epiwk  = if_else( MMWRweek<=26, MMWRweek+52, MMWRweek  ),
+          epiwk=epiwk-26
+  )
+
+write.csv(combined_file_covid,'./Data/plot_files/covid_combined_all_outcomes_state.csv')
 
 
 ##############################################################
@@ -380,21 +580,22 @@ dates <- seq.Date(from=as.Date('2022-10-01'), to=Sys.Date(),by='week')
 
 i=length(dates)-1
 
-d1_state <- open_dataset('./Data/live_files/nssp_rsv_county.parquet') %>%
+d1_state_rsv_flu_covid <- cdc_nssp_rsv_flu_covid_ed1 %>%
   filter(county=='All'  ) %>%
-  rename(percent_visits_rsv_state =percent_visits_rsv ) %>%
+  rename(percent_visits_rsv_state =percent_visits_rsv,
+         percent_visits_covid_state =percent_visits_covid,
+         percent_visits_flu_state =percent_visits_influenza) %>%
   # percent_visits_rsv_state=if_else(percent_visits_rsv>1,1,percent_visits_rsv) ) %>%
   rename(state=geography) %>%
-  dplyr::select(state,week_end, percent_visits_rsv_state) %>%
-  collect()
+  dplyr::select(state,week_end, percent_visits_rsv_state,percent_visits_covid_state, percent_visits_flu_state) 
 
-d1_all <- open_dataset('./Data/live_files/nssp_rsv_county.parquet') %>%
+d1_all <- cdc_nssp_rsv_flu_covid_ed1 %>%
   filter(county!='All' ) %>%
-  collect() %>%
   rename(state=geography) %>%
-  dplyr::select(state, county, fips, week_end, percent_visits_rsv) %>%
-  left_join(d1_state, by=c('week_end', 'state')) %>%
-  mutate(percent_visits_rsv = if_else(is.na(percent_visits_rsv),percent_visits_rsv_state,percent_visits_rsv ),
+  dplyr::select(state, county, fips, week_end, percent_visits_rsv,percent_visits_covid,percent_visits_influenza) %>%
+  left_join(d1_state_rsv_flu_covid, by=c('week_end', 'state')) %>%
+  mutate(percent_visits_covid = if_else(is.na(percent_visits_covid),percent_visits_covid_state,percent_visits_covid),
+         percent_visits_flu = if_else(is.na(percent_visits_influenza),percent_visits_flu_state,percent_visits_influenza ),
          #fix CT county coding
          fips = if_else(state=='Connecticut' & county=='Fairfield',9001 ,
                         if_else(state=='Connecticut' &  county=='Hartford', 9003,
@@ -407,7 +608,7 @@ d1_all <- open_dataset('./Data/live_files/nssp_rsv_county.parquet') %>%
          ) ) %>%
   as.data.frame()
 
-write.csv(d1_all,'./Data/plot_files/rsv_county_filled_map_nssp.csv')
+write.csv(d1_all,'./Data/plot_files/rsv_flu_covid_county_filled_map_nssp.csv')
 
 #fluA
 #ww_flu1 <- read.csv('https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/FluA/FluAStateMapDownloadCSV.csv')%>%
@@ -454,3 +655,43 @@ write.csv(d1_all,'./Data/plot_files/rsv_county_filled_map_nssp.csv')
 #           
 #           search_volume_scale = search_volume/max(search_volume,na.rm=T)*100) %>%
 #    ungroup() 
+
+#csv_to_parquet('https://data.cdc.gov/resource/qvzb-qs6p.csv',path_to_parquet ='./Data/ipd_cdc1998.parquet')
+
+ipd1 <- readRDS('./Data/Archive/pneumococcus/ABCs_st_1998_2023.rds') %>%
+  rename(agec = "Age.Group..years.",
+         year=Year,
+         st=IPD.Serotype,
+         N_IPD = Frequency.Count) %>%
+  mutate( st= if_else(st=='16','16F', st),
+          agec1 = if_else(agec %in% c("Age <2","Age 2-4") ,1,2 ),
+          agec=gsub('Age ', '', agec),
+          agec2 = if_else( agec %in% c('<2','2-4'), '<5',
+                           if_else( agec %in% c('5-17','18-49'), '5-49',
+                                    if_else( agec %in% c('50-64','65+'), '50+',NA))),
+          agec2 = factor(agec2, levels=c('<5','5-49','50+'), labels=c('<5 years', '5-49 years', '50+ years') )
+  ) %>%
+  group_by(st,agec2, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup()
+
+write.csv(ipd1, './Data/plot_files/ipd_serotype_age_year.csv')
+
+
+
+# pneumococcal serotype by state
+b2019 <- read.csv('./Data/Archive/pneumococcus/jiac058_suppl_supplementary_table_s2.csv') %>%
+  group_by(State, sero) %>%
+  summarize(N_cases=n()) %>%
+  mutate(sero=as.factor(sero)) %>%
+  ungroup() %>%
+  group_by(State, sero) %>%
+  mutate(mean_cases=max(N_cases,na.rm=T)
+  ) %>%
+  group_by(State) %>%
+  mutate(         pct = N_cases/sum(N_cases, na.rm=T)*100) %>%
+  ungroup() %>%
+  tidyr::complete(sero,State , fill=list(pct=0))  #fills 0
+
+write.csv(b2019, './Data/plot_files/ipd_serotype_state_pct.csv')
+

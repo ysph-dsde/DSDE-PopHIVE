@@ -1,0 +1,14 @@
+name: PopHIVE
+title: popHIVE
+username: weinbergerlab
+account: weinbergerlab
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 13963387
+bundleId: 10082601
+url: https://weinbergerlab.shinyapps.io/PopHIVE/
+version: 1
+quarto_version: 1.2.475
+quarto_engines: knitr
+asMultiple: FALSE
+asStatic: FALSE

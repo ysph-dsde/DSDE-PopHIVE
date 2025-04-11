@@ -1,0 +1,14 @@
+name: pophive_TESTXyz
+title: popHIVE_TESTXyz
+username: weinbergerlab
+account: weinbergerlab
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 14026351
+bundleId: 9873007
+url: https://weinbergerlab.shinyapps.io/pophive_TESTXyz/
+version: 1
+quarto_version: 1.4.555
+quarto_engines: knitr
+asMultiple: FALSE
+asStatic: FALSE

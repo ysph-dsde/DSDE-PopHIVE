@@ -1,0 +1,1895 @@
+---
+title: "PopHIVE: Population Health Information and Visualization Exchange"
+title-block-banner: "#0c233f"
+format:
+  html:
+    embed-resources: true
+    page-layout: full
+    toc: true
+    toc-expand: true
+    smooth-scroll: true
+    theme: cosmo
+project:
+  execute-dir: project
+css: /R/styles.css
+server: shiny
+---
+
+```{r setup}
+#| context: setup
+#| include: false
+
+knitr::opts_chunk$set(fig.width = 12, fig.align = "center")
+
+# Field "panel" has value toolbar, which must instead be one of: `tabset`, `input`, `sidebar`, `fill`, `center`
+
+#https://r-graph-gallery.com/183-choropleth-map-with-leaflet.html
+suppressPackageStartupMessages({
+library(tidyverse)
+library(plotly)
+library(shiny)
+library(tidyverse)
+library(scales)
+library(janitor)
+library(MMWRweek)
+library(arrow)
+#library(rnaturalearth)
+library(parquetize)
+library(viridisLite)
+library(tigris)
+library(usmap)
+library(cowplot)
+library(leaflet)
+library(viridis)
+library(sf)
+library(ggrepel)
+library(readxl)
+library(ggalluvial)
+library(waffle)
+  
+})
+#library(cdcfluview)
+#install.packages("remotes")
+#remotes::install_github("hrbrmstr/cdcfluview")
+#hhs_regions$state <- state.abb[match(hhs_regions$state_or_territory,state.name)]
+#state.hhs.codes <- aggregate(hhs_regions$state, #list(hhs_regions$region), paste, collapse=",")
+#state.hhs.codes$x <- gsub('NA,','',state.hhs.codes$x)
+#state.hhs.codes$x <- gsub(',NA','',state.hhs.codes$x)
+#saveRDS(state.hhs.codes, './hhs_regions.rds')
+
+yale_colors <- c(
+  "#00356B",
+  "#286DC0",
+  "#63AAFF",
+  "#C4DDFC",
+  "#DDDDDD"
+)
+
+yale_gradient <- c("#DDDDDD",
+                   "#C4DDFC",
+                   "#63AAFF",
+                   "#286DC0",
+                   "#00356B") # Adjust order for your desired gradient
+
+
+
+#datasets for use in the global environment
+
+
+"%!in%" <- function(x,y)!("%in%"(x,y))
+
+
+#Defines a general function that can be reused for age plots
+age_ts_plot <- function(ds.in=epic_ed_combo, scale_var=input$scale.rsv, outcome_select='RSV', tslabel='RSV'){
+  
+ plot_ds <- ds.in %>%
+    filter(geography==input$state.select5 & date >=as.Date('2023-07-01') & outcome_name==outcome_select, age_level != 'Total' ) %>%
+   mutate(plotvar = if_else(scale_var==T,Outcome_value3, Outcome_value2 ))
+ 
+ ts_compare <- plot_ds %>%
+    ggplot()+
+    geom_line(aes(x=date, y=plotvar, group_by=age_level, color=age_level)) +
+    theme_minimal()+
+    xlab('Date')+
+    ylab(paste0('Percent of ED visits for ', tslabel))+
+    scale_colour_viridis_d() +
+    ggtitle(paste0('ED visits for ', tslabel, ' in ',input$state.select5))
+  
+  ggplotly(ts_compare)
+  
+}
+```
+
+## Welcome to PopHIVE
+
+This platform is designed to give its users timely, clear, and useful insights into community health. We bring together data from multiple sources—like public health reports, electronic health records, sewage testing, online search trends, surveys, and predictive models—to help paint a fuller picture of health trends. We're just getting started and will be adding even more data and disease insights in the coming months. This project is led by the Yale School of Public Health.
+
+------------------------------------------------------------------------
+
+## Respiratory infections
+
+::: panel-tabset
+### Respiratory Syncytial Virus (RSV)
+
+*RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months. State-level data typically represent certain regions or subsets of the population and do not necessarily represent disease spread in the entire state*
+
+```{r}
+#| context: data
+#| include: false
+
+nrevss_rsv_ts <- read_csv('./Data/plot_files/rsv_ts_nrevss_test_rsv.csv') 
+
+rsv_all_indicators_state <- read_csv('./Data/plot_files/rsv_combined_all_outcomes_state.csv')
+
+flu_all_indicators_state <- read_csv('./Data/plot_files/flu_combined_all_outcomes_state.csv')
+
+covid_all_indicators_state <- read_csv('./Data/plot_files/covid_combined_all_outcomes_state.csv')
+
+rsvnet_age <- read_csv('./Data/plot_files/rsv_hosp_age_respnet.csv')
+
+epic_ed_combo <- read_csv('./Data/plot_files/rsv_flu_covid_epic_cosmos_age_state.csv')
+
+rsv_flu_covid_county_filled_nssp <- read_csv('./Data/plot_files/rsv_flu_covid_county_filled_map_nssp.csv')
+```
+
+```{r rsv_plots}
+#| context: server
+#| include: false
+
+########################################
+##RSV
+########################################
+output$distPlotRSV3 <- renderPlotly({
+  
+  point_plot <- nrevss_rsv_ts %>% filter(hhs_abbr==input$hhs.region.select &  epiyr == max(epiyr, na.rm=T) ) %>%
+    filter(epiwk==max(epiwk))
+  
+  rsv_ts1 <- nrevss_rsv_ts %>%
+    filter(x==input$hhs.region.select) %>%
+    ggplot(aes(x=epiwk, y=scaled_cases, group=as.factor(epiyr), color=as.factor(epiyr)))+
+    geom_line()+
+    theme_minimal()+
+    xlab('Weeks since July')+
+    ylab('RSV positive tests')+
+    scale_colour_viridis_d() +
+    geom_point(data=point_plot,aes(x=epiwk, y=scaled_cases) ,col='red') +
+    guides(color=guide_legend(title="Season starting:"))
+  
+  
+  ggplotly(rsv_ts1)
+})
+
+
+############################
+
+output$distPlotRSV_dwh <- renderPlotly({
+  
+ pal1 <- RColorBrewer::brewer.pal(n=length(unique(rsv_all_indicators_state$outcome_label1))+1,'Set1' )
+pal1 <- pal1[-6]
+ 
+rsv_ts_comp <- rsv_all_indicators_state %>%
+    filter(geography==input$state.select2 ) %>%
+    mutate(ds_label = if_else(outcome_label1=='Google Searches 1', 'Google 1',
+           if_else(outcome_label1=='Google Searches 2', 'Google 2',
+                 if_else(outcome_label1=='Pct of ED visits', 'ED visits (CDC/NSSP)',           
+                         if_else(outcome_label1=='Pct of ED visits (Epic)', 'ED visits (Epic cosmos)', 
+                                 if_else(outcome_label1=='Hospitalizations', 'Hospitalization Resp-Net)', outcome_label1
+                                     
+                   )))))
+           ) %>%
+    ggplot()+
+  geom_line(aes(x=date, y=outcome_3m_scale, color=ds_label,linetype=ds_label, group=ds_label,
+                text=paste0(geography, "<br>", 
+                            source, "<br>", 
+                           outcome_label1, "<br>",
+                           Outcome_value1, "<br>",
+                           date, "<br>"
+                           ))) +
+
+            theme_minimal() +
+    xlab('Date')+
+    labs(color='Source') +
+    ylab('RSV activity (scaled to 100)')+
+   scale_color_manual(values=pal1) +
+    ggtitle(input$state.select2)
+  
+  ggplotly(rsv_ts_comp,tooltip='text')
+
+})
+
+
+#hospitalization by age
+output$distPlotRSV_hosp_age <- renderPlotly({
+  
+  rsv_ts_comp <- rsvnet_age %>%
+    filter(state==input$state.select3 & date >=as.Date('2023-07-01')) %>%
+    
+    ggplot()+
+    geom_line(aes(x=date, y=scale_age, group_by=Level, color=Level)) +
+    theme_minimal()+
+    xlab('Date')+
+    ylab('RSV activity (CDC surveillance)')+
+    scale_colour_viridis_d() +
+    ggtitle(paste0(input$state.select3, ' CDC hospital surveillance'))
+  
+  ggplotly(rsv_ts_comp)
+})
+
+
+#epic ED by age
+output$distPlotRSV_epic_ED_age <- renderPlotly({
+  
+  
+  if(input$scale.rsv==F){
+  rsv_epic_ts_comp <- epic_ed_combo %>%
+    filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='RSV' & age_level !='Total') %>%
+    ggplot()+
+    geom_line(aes(x=date, y=Outcome_value2, group_by=age_level, color=age_level)) +
+    theme_minimal()+
+    xlab('Date')+
+    ylab('Percent of ED visits for RSV (Epic Cosmos)')+
+    scale_colour_viridis_d() +
+    ggtitle(paste0('ED visits for RSV in ',input$state.select3))
+  
+  ggplotly(rsv_epic_ts_comp)
+  
+  }else{
+      rsv_epic_ts_comp <- epic_ed_combo %>%
+    filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='RSV' & age_level !='Total') %>%
+    
+    ggplot()+
+    geom_line(aes(x=date, y=Outcome_value3, group_by=age_level, color=age_level)) +
+    theme_minimal()+
+    xlab('Date')+
+    ylab('Rescaled ED visits for RSV (Epic Cosmos)')+
+    scale_colour_viridis_d() +
+    ggtitle(paste0('ED visits for RSV in ',input$state.select3))
+  
+  ggplotly(rsv_epic_ts_comp)
+  }
+  
+})
+
+
+output$epicMapRSV <- renderPlotly({
+
+ map_data <- epic_ed_combo %>%
+      filter(date == input$selected_date & age_level == '<1 Years' & outcome_name=='RSV') %>%
+      mutate(state = state.abb[match(geography, state.name)] ,
+             #Note, if >20%, cap at 20 for plotting!
+           Outcome_value2 = if_else(Outcome_value2>20,20, Outcome_value2) 
+           #Outcome_value2 = if_else(Outcome_value4<5, Outcome_value4*0.01 ,Outcome_value2) #deals with cell suppression
+           ) %>%
+   filter(!is.na(state)) %>%
+   as.data.frame()
+
+ max.val <- max(epic_ed_combo$Outcome_value2, na.rm=T)
+pal1 <- viridis_pal()(4)
+date.print <- input$selected_date
+
+p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value2") +
+scale_fill_gradientn(
+    colors = pal1,
+    values = scales::rescale(c(0, 5, 10, 15, 20)),
+    limits = c(0, 20),
+    na.value = "#440154FF"
+  ) +
+  ggtitle(paste("RSV ED Visit Percentage <1 year olds on", date.print))
+
+ggplotly(p1)
+})
+
+```
+
+::: panel-tabset
+#### Overall Trends
+
+```{r}
+#| panel: toolbar
+
+selectInput("state.select2", "State:", 
+            choices=state.name, selected='New York')
+```
+
+```{r}
+#| panel: fill
+
+plotlyOutput("distPlotRSV_dwh")
+
+```
+
+|                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). The Google Trends data are obtained from the Google Health Trends API (volume of searches for 'rsv', subtracting volume of searches for category "respiratory syncytial virus vaccine" (Knowledge graph: /g/11j30ybfx6) ). Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/dwh_combined_plot1_long.csv). |
+
+#### Trends in positive tests
+
+```{r}
+#| panel: toolbar
+
+selectInput("hhs.region.select", "Region:", 
+            choices=unique(nrevss_rsv_ts$hhs_abbr), selected='CT,ME,MA,NH,RI,VT')
+```
+
+```{r}
+#| panel: fill
+plotlyOutput("distPlotRSV3")
+
+```
+
+These data come from the NREVSS surveillance system, which is comprised of laboratories around the US. Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/rsv_ts_nrevss_test_rsv.csv).
+
+#### By age
+
+```{r}
+#| panel: toolbar
+
+selectInput("state.select3", "State:", 
+            choices=state.name, selected='New York')
+
+checkboxInput("scale.rsv", "Rescale?", 
+           value=T)
+```
+
+```{r}
+#| panel: fill
+
+plotlyOutput("distPlotRSV_epic_ED_age")
+
+plotlyOutput("distPlotRSV_hosp_age")
+
+
+```
+
+The hospitalization data comes from the RSV-NET, a CDC-supported network of sites around the US that tracks hospitalizations from RSV, influenza, and COVID-19. Data are smoothed with a 3 week average for vizualization. Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/rsv_ts_nrevss_test_rsv.csv).
+
+#### Map of ED visits (state)
+
+```{r}
+#| panel: toolbar
+
+sliderInput("selected_date", label=NULL, 
+                  min = min(epic_ed_combo$date), 
+                  max = max(epic_ed_combo$date),
+                  value = as.Date('2024-10-19'),
+                 step=7,
+                  timeFormat = "%Y-%m-%d",
+                  animate = animationOptions(interval = 1000, loop = TRUE, playButton = 'P',pauseButton = 'S'))
+    
+```
+
+```{r}
+#| panel: fill
+
+      plotlyOutput("epicMapRSV")
+
+```
+
+Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/epic_ed_combo_rsv_flu_covid.csv).
+
+#### Map of ED visits (county)
+
+```{r}
+#| panel: fill
+
+   subtitle= 'National Syndromic Surveillance Program (CDC)'
+   scaletitle= 'Percent'
+  
+pal1 <- viridis::viridis_pal()(4)
+
+dates <- seq.Date(from=as.Date('2022-10-01'), to=Sys.Date(),by='week')
+
+
+p1 <- rsv_flu_covid_county_filled_nssp %>%
+  filter(week_end==max(week_end)) %>%
+         usmap::plot_usmap(regions='county', data=.,values='percent_visits_rsv',
+                        color = NA,    # Faint border color
+                        size = 0     )+      # Thin border lines)   +
+  theme(panel.background = element_rect(color = "white", fill = "white")) +
+ scale_fill_gradientn(
+   scaletitle,
+    colors = pal1,
+    values = scales::rescale(c(0, 0.33, 0.66, 0.99, max(rsv_flu_covid_county_filled_nssp$percent_visits_rsv))),
+    limits = c(0, max(rsv_flu_covid_county_filled_nssp$percent_visits_rsv)),
+    na.value = "darkgray"
+  )
+
+
+plotly::ggplotly(p1)%>%
+  layout(title = list(text = paste0(paste0('RSV ED visits by jurisdiction ', max(rsv_flu_covid_county_filled_nssp$week_end)),
+                                    '<br>',
+                                    '<sup>',
+                                     subtitle,'</sup>')))
+```
+
+The maps shows the percentage of ED visits in each jurisdiction caused by RSV. Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network. Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/rsv_county_filled_map_nssp.csv).
+
+#### Maps of Google searches
+
+*Coming soon*
+
+```{r}
+#| panel: toolbar
+
+# sliderInput("date.select2", label=NULL, 
+#                   min = min(epic_ed_combo$date), 
+#                   max = max(epic_ed_combo$date),
+#                   value = as.Date('2024-10-19'),
+#                  step=7,
+#                   timeFormat = "%Y-%m-%d")
+    
+```
+
+```{r}
+#| panel: fill
+
+#plotlyOutput('googleMapRSV')
+```
+
+People searching for information on RSV often correlates well with actual clinical activity for RSV.
+:::
+
+### Influenza (Seasonal Flu)
+
+```{r flu_plots}
+#| context: server
+#| include: false
+
+########################################
+##flu
+########################################
+
+############################
+
+output$distPlotflu_dwh <- renderPlotly({
+  
+  pal1 <- RColorBrewer::brewer.pal(n=length(unique(flu_all_indicators_state$outcome_label1))+1,'Set1' )
+  pal1 <- pal1[-6]
+  
+  flu_ts_comp <- flu_all_indicators_state %>%
+    filter(geography==input$state.select2 ) %>%
+    mutate(ds_label = if_else(outcome_label1=='Google Searches 1', 'Google 1',
+                              if_else(outcome_label1=='Google Searches 2', 'Google 2',
+                                      if_else(outcome_label1=='Pct of ED visits', 'ED visits (CDC/NSSP)',           
+                                              if_else(outcome_label1=='Pct of ED visits (Epic)', 'ED visits (Epic cosmos)', 
+                                                      if_else(outcome_label1=='Hospitalizations', 'Hospitalization Resp-Net)', outcome_label1
+                                                              
+                                                      )))))
+    ) %>%
+    ggplot()+
+    geom_line(aes(x=date, y=outcome_3m_scale, color=ds_label,linetype=ds_label, group=ds_label,
+                  text=paste0(geography, "<br>", 
+                              source, "<br>", 
+                              outcome_label1, "<br>",
+                              Outcome_value1, "<br>",
+                              date, "<br>"
+                  ))) +
+    
+    theme_minimal() +
+    xlab('Date')+
+    labs(color='Source') +
+    ylab('Influenza activity (scaled to 100)')+
+    scale_color_manual(values=pal1) +
+    ggtitle(input$state.select2)
+  
+  ggplotly(flu_ts_comp,tooltip='text')
+  
+})
+
+
+#epic ED by age
+output$distPlotflu_epic_ED_age <- renderPlotly({
+  
+  
+  if(input$scale.flu==F){
+    flu_epic_ts_comp <- epic_ed_combo %>%
+      filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='FLU' & age_level !='Total') %>%
+      ggplot()+
+      geom_line(aes(x=date, y=Outcome_value2, group_by=age_level, color=age_level)) +
+      theme_minimal()+
+      xlab('Date')+
+      ylab('Percent of ED visits for flu (Epic Cosmos)')+
+      scale_colour_viridis_d() +
+      ggtitle(paste0('ED visits for flu in ',input$state.select3))
+    
+    ggplotly(flu_epic_ts_comp)
+    
+  }else{
+    flu_epic_ts_comp <- epic_ed_combo %>%
+      filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='FLU' & age_level !='Total') %>%
+      
+      ggplot()+
+      geom_line(aes(x=date, y=Outcome_value3, group_by=age_level, color=age_level)) +
+      theme_minimal()+
+      xlab('Date')+
+      ylab('Rescaled ED visits for influenza (Epic Cosmos)')+
+      scale_colour_viridis_d() +
+      ggtitle(paste0('ED visits for influenza in ',input$state.select3))
+    
+    ggplotly(flu_epic_ts_comp)
+  }
+  
+})
+
+
+output$epicMapflu <- renderPlotly({
+  
+  map_data <- epic_ed_combo %>%
+    filter(date == input$selected_date & age_level == '<1 Years' & outcome_name=='FLU') %>%
+    mutate(state = state.abb[match(geography, state.name)] ,
+           #Note, if >20%, cap at 20 for plotting!
+           Outcome_value2 = if_else(Outcome_value2>20,20, Outcome_value2) 
+           #Outcome_value2 = if_else(Outcome_value4<5, Outcome_value4*0.01 ,Outcome_value2) #deals with cell suppression
+    ) %>%
+    filter(!is.na(state)) %>%
+    as.data.frame()
+  
+  max.val <- max(epic_ed_combo$Outcome_value2, na.rm=T)
+  pal1 <- viridis_pal()(4)
+  date.print <- input$selected_date
+  
+  p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value2") +
+    scale_fill_gradientn(
+      colors = pal1,
+      values = scales::rescale(c(0, 5, 10, 15, 20)),
+      limits = c(0, 20),
+      na.value = "#440154FF"
+    ) +
+    ggtitle(paste("Influenza ED Visit Percentage <1 year olds on", date.print))
+  
+  ggplotly(p1)
+})
+
+```
+
+::: panel-tabset
+#### Overall Trends
+
+```{r}
+#| panel: toolbar
+
+selectInput("state.select2", "State:", 
+            choices=state.name, selected='New York')
+```
+
+```{r}
+#| panel: fill
+
+plotlyOutput("distPlotflu_dwh")
+
+```
+
+|                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/dwh_combined_plot1_long.csv). |
+
+\#### Trends in positive tests
+
+#### By age
+
+```{r}
+#| panel: toolbar
+
+selectInput("state.select3", "State:", 
+            choices=state.name, selected='New York')
+
+checkboxInput("scale.flu", "Rescale?", 
+              value=T)
+```
+
+```{r}
+#| panel: fill
+
+plotlyOutput("distPlotflu_epic_ED_age")
+
+
+```
+
+Data are smoothed with a 3 week average for vizualization.
+
+#### Map of ED visits (state)
+
+```{r}
+#| panel: toolbar
+
+sliderInput("selected_date", label=NULL, 
+            min = min(epic_ed_combo$date), 
+            max = max(epic_ed_combo$date),
+            value = as.Date('2024-10-19'),
+            step=7,
+            timeFormat = "%Y-%m-%d",
+            animate = animationOptions(interval = 1000, loop = TRUE, playButton = 'P',pauseButton = 'S'))
+
+```
+
+```{r}
+#| panel: fill
+
+plotlyOutput("epicMapflu")
+
+```
+
+Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/epic_ed_combo_rsv_flu_covid.csv).
+
+#### Map of ED visits (county)
+
+```{r}
+#| panel: fill
+
+subtitle= 'National Syndromic Surveillance Program (CDC)'
+scaletitle= 'Percent'
+
+pal1 <- viridis::viridis_pal()(4)
+
+dates <- seq.Date(from=as.Date('2022-10-01'), to=Sys.Date(),by='week')
+
+
+p1 <- rsv_flu_covid_county_filled_nssp %>%
+  filter(week_end==max(week_end)) %>%
+  usmap::plot_usmap(regions='county', data=.,values='percent_visits_flu',
+                    color = NA,    # Faint border color
+                    size = 0     )+      # Thin border lines)   +
+  theme(panel.background = element_rect(color = "white", fill = "white")) +
+  scale_fill_gradientn(
+    scaletitle,
+    colors = pal1,
+    values = scales::rescale(c(0, 0.33, 0.66, 0.99, max(rsv_flu_covid_county_filled_nssp$percent_visits_flu))),
+    limits = c(0, max(rsv_flu_covid_county_filled_nssp$percent_visits_flu)),
+    na.value = "darkgray"
+  )
+
+
+plotly::ggplotly(p1)%>%
+  layout(title = list(text = paste0(paste0('Influenza ED visits by jurisdiction ', max(rsv_flu_covid_county_filled_nssp$week_end)),
+                                    '<br>',
+                                    '<sup>',
+                                    subtitle,'</sup>')))
+```
+
+The maps shows the percentage of ED visits in each jurisdiction caused by influenza Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network. Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/rsv_county_filled_map_nssp.csv).
+:::
+
+### Covid-19
+
+```{r covid_plots}
+#| context: server
+#| include: false
+
+########################################
+##covid
+########################################
+
+############################
+
+output$distPlotcovid_dwh <- renderPlotly({
+  
+  pal1 <- RColorBrewer::brewer.pal(n=length(unique(covid_all_indicators_state$outcome_label1))+1,'Set1' )
+  pal1 <- pal1[-6]
+  
+  covid_ts_comp <- covid_all_indicators_state %>%
+    filter(geography==input$state.select2 ) %>%
+    mutate(ds_label = if_else(outcome_label1=='Google Searches 1', 'Google 1',
+                              if_else(outcome_label1=='Google Searches 2', 'Google 2',
+                                      if_else(outcome_label1=='Pct of ED visits', 'ED visits (CDC/NSSP)',           
+                                              if_else(outcome_label1=='Pct of ED visits (Epic)', 'ED visits (Epic cosmos)', 
+                                                      if_else(outcome_label1=='Hospitalizations', 'Hospitalization Resp-Net)', outcome_label1
+                                                              
+                                                      )))))
+    ) %>%
+    ggplot()+
+    geom_line(aes(x=date, y=outcome_3m_scale, color=ds_label,linetype=ds_label, group=ds_label,
+                  text=paste0(geography, "<br>", 
+                              source, "<br>", 
+                              outcome_label1, "<br>",
+                              Outcome_value1, "<br>",
+                              date, "<br>"
+                  ))) +
+    
+    theme_minimal() +
+    xlab('Date')+
+    labs(color='Source') +
+    ylab('COVID-19 activity (scaled to 100)')+
+    scale_color_manual(values=pal1) +
+    ggtitle(input$state.select2)
+  
+  ggplotly(covid_ts_comp,tooltip='text')
+  
+})
+
+
+#epic ED by age
+output$distPlotcovid_epic_ED_age <- renderPlotly({
+  
+  
+  if(input$scale.covid==F){
+    covid_epic_ts_comp <- epic_ed_combo %>%
+      filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='COVID' & age_level !='Total') %>%
+      ggplot()+
+      geom_line(aes(x=date, y=Outcome_value2, group_by=age_level, color=age_level)) +
+      theme_minimal()+
+      xlab('Date')+
+      ylab('Percent of ED visits for covid (Epic Cosmos)')+
+      scale_colour_viridis_d() +
+      ggtitle(paste0('ED visits for COVID-19 in ',input$state.select3))
+    
+    ggplotly(covid_epic_ts_comp)
+    
+  }else{
+    covid_epic_ts_comp <- epic_ed_combo %>%
+      filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='COVID' & age_level !='Total') %>%
+      
+      ggplot()+
+      geom_line(aes(x=date, y=Outcome_value3, group_by=age_level, color=age_level)) +
+      theme_minimal()+
+      xlab('Date')+
+      ylab('Rescaled ED visits for COVID-19 (Epic Cosmos)')+
+      scale_colour_viridis_d() +
+      ggtitle(paste0('ED visits for COVID-19 in ',input$state.select3))
+    
+    ggplotly(covid_epic_ts_comp)
+  }
+  
+})
+
+
+output$epicMapcovid <- renderPlotly({
+  
+  map_data <- epic_ed_combo %>%
+    filter(date == input$selected_date & age_level == '<1 Years' & outcome_name=='COVID') %>%
+    mutate(state = state.abb[match(geography, state.name)] ,
+           #Note, if >20%, cap at 20 for plotting!
+           Outcome_value2 = if_else(Outcome_value2>20,20, Outcome_value2) 
+           #Outcome_value2 = if_else(Outcome_value4<5, Outcome_value4*0.01 ,Outcome_value2) #deals with cell suppression
+    ) %>%
+    filter(!is.na(state)) %>%
+    as.data.frame()
+  
+  max.val <- max(epic_ed_combo$Outcome_value2, na.rm=T)
+  pal1 <- viridis_pal()(4)
+  date.print <- input$selected_date
+  
+  p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value2") +
+    scale_fill_gradientn(
+      colors = pal1,
+      values = scales::rescale(c(0, 5, 10, 15, 20)),
+      limits = c(0, 20),
+      na.value = "#440154FF"
+    ) +
+    ggtitle(paste("COVID-19 ED Visit Percentage <1 year olds on", date.print))
+  
+  ggplotly(p1)
+})
+
+```
+
+::: panel-tabset
+#### Overall Trends
+
+```{r}
+#| panel: toolbar
+
+selectInput("state.select2", "State:", 
+            choices=state.name, selected='New York')
+```
+
+```{r}
+#| panel: fill
+
+plotlyOutput("distPlotcovid_dwh")
+
+```
+
+|                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/dwh_combined_plot1_long.csv). |
+
+\#### Trends in positive tests
+
+#### By age
+
+```{r}
+#| panel: toolbar
+
+selectInput("state.select3", "State:", 
+            choices=state.name, selected='New York')
+
+checkboxInput("scale.covid", "Rescale?", 
+              value=T)
+```
+
+```{r}
+#| panel: fill
+
+plotlyOutput("distPlotcovid_epic_ED_age")
+
+
+```
+
+Data are smoothed with a 3 week average for vizualization.
+
+#### Map of ED visits (state)
+
+```{r}
+#| panel: toolbar
+
+sliderInput("selected_date", label=NULL, 
+            min = min(epic_ed_combo$date), 
+            max = max(epic_ed_combo$date),
+            value = as.Date('2024-10-19'),
+            step=7,
+            timeFormat = "%Y-%m-%d",
+            animate = animationOptions(interval = 1000, loop = TRUE, playButton = 'P',pauseButton = 'S'))
+
+```
+
+```{r}
+#| panel: fill
+
+plotlyOutput("epicMapcovid")
+
+```
+
+Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/epic_ed_combo_rsv_flu_covid.csv).
+
+#### Map of ED visits (county)
+
+```{r}
+#| panel: fill
+
+subtitle= 'National Syndromic Surveillance Program (CDC)'
+scaletitle= 'Percent'
+
+pal1 <- viridis::viridis_pal()(4)
+
+dates <- seq.Date(from=as.Date('2022-10-01'), to=Sys.Date(),by='week')
+
+
+p1 <- rsv_flu_covid_county_filled_nssp %>%
+  filter(week_end==max(week_end)) %>%
+  usmap::plot_usmap(regions='county', data=.,values='percent_visits_covid',
+                    color = NA,    # Faint border color
+                    size = 0     )+      # Thin border lines)   +
+  theme(panel.background = element_rect(color = "white", fill = "white")) +
+  scale_fill_gradientn(
+    scaletitle,
+    colors = pal1,
+    values = scales::rescale(c(0, 0.33, 0.66, 0.99, max(rsv_flu_covid_county_filled_nssp$percent_visits_covid))),
+    limits = c(0, max(rsv_flu_covid_county_filled_nssp$percent_visits_covid)),
+    na.value = "darkgray"
+  )
+
+
+plotly::ggplotly(p1)%>%
+  layout(title = list(text = paste0(paste0('COVID-19 ED visits by jurisdiction ', max(rsv_flu_covid_county_filled_nssp$week_end)),
+                                    '<br>',
+                                    '<sup>',
+                                    subtitle,'</sup>')))
+```
+
+The maps shows the percentage of ED visits in each jurisdiction caused by COVID-19 Some states have county-level data available, while others have state-level data only. This includes data aggregated across all age groups. Ideally this would be broken out separately for infants and older adults. The data come from the national syndromic surveillance network. Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/rsv_county_filled_map_nssp.csv).
+:::
+
+### Pneumococcus
+
+*Pneumococcus is an important bacterial pathogen that causes severe disease like meningitis, blood-stream infections, and pneumonia. It also is a major cause of ear infections in children. Vaccines (PCVs) have been in use in the USA since 2000, with a switch to a new PCV that covered more strains in 2010. The introduction of these vaccines has largely led to the elimination of vaccine-targeted serotypes and smaller increases in disease caused by other serotypes. Some vaccine-targeted serotypes have recently re-emerged (e.g., 19F) for reasons that are still not clear.*
+
+```{r pneumococcus_data}
+#| context: data
+#| include: false
+#| cache: true
+#| cache.extra: !expr file.info("data.csv")$mtime
+
+
+ipd_serotype_age <- read_csv('./Data/plot_files/ipd_serotype_age_year.csv')
+all.sts <- unique(ipd_serotype_age$st)
+
+
+ipd_serotype_state <- read_csv('./Data/plot_files/ipd_serotype_state_pct.csv')
+
+
+```
+
+```{r pneumococcus_plots}
+#| context: server 
+#Pneumococcal disease
+output$stPlot <- renderPlotly({
+  p1 <- ipd_serotype_age  %>%
+    filter(st %in% c(input$select.st)) %>%
+    ggplot(aes(x=year, y=N_IPD))+
+    geom_line()+
+    facet_wrap(~agec2, scales ='free', nrow=1) +
+    theme_classic()+
+    theme(axis.text.x = element_text(angle = 45, vjust = 1.0, hjust=1)) +
+    geom_vline(xintercept=c(1999.5, 2009.5), lty=2, color='gray')+
+    ylim(0,NA) +
+    ggtitle(paste0('Trends in IPD caused by serotype ', input$select.st, ' in the US'))
+  ggplotly(p1)
+})
+
+
+#serotype geography
+output$stGeographyPlot <- renderPlotly({
+  
+  ipd_serotype_state %>%
+    filter(sero==input$select.st2 ) %>%
+    ggplot( aes(fill=State, y=pct, x=sero)) +
+    geom_bar(position="dodge", stat="identity")+
+    scale_fill_viridis_d()+
+    theme_minimal()+
+    ylab('Proportion of IPD cases in the state') +
+    ggtitle(input$select.st2)
+})
+```
+
+::: panel-tabset
+#### Trends in serotype frequency
+
+```{r}
+#| panel: toolbar
+selectInput("select.st",
+            "Select serotype:",
+            all.sts,
+            selected='19F')
+```
+
+```{r}
+#| panel: fill
+plotlyOutput("stPlot")
+
+```
+
+This shows trends in Invasive Pneumococcal Disease caused by different serotypes, as reported to the Active Bacterial Core Surevillance system (ABCs) at CDC. This is a network of 10 sites around the US.
+
+#### Change in Invasive pneumococcal Disease 1998-2022
+
+```{r pneumococcus_data_2}
+#| include: false
+
+pcv7 <- c('4','6B','9V','14','18C','19F','23F')
+
+pcv10gsk <- c(pcv7,'1','5','7F')
+
+pcv13 <- c(pcv7, '1','3','5','6A','7F','19A')
+
+s1 <- readRDS('./Data/Archive/pneumococcus/ABCs_st_1998_2021.rds') %>%
+  rename(agec = "Age.Group..years.",
+         year=Year,
+         st=IPD.Serotype,
+         N_IPD = Frequency.Count) %>%
+  mutate( st= if_else(st=='16','16F', st)) %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup() %>%
+  group_by(st) %>%
+  mutate(cum_N= sum(N_IPD)) %>%
+  filter(cum_N>100) %>%
+  ungroup() %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT'))
+s2_pre<- s1 %>%
+  filter(year %in% c(1998, 1999)) %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup() %>%
+  group_by(st) %>%
+  summarize(N_IPD_pre=mean(N_IPD)) %>%
+  ungroup() %>%
+  tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
+
+s2_pre13<- s1 %>%
+  filter(year %in% c(2008, 2009)) %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>%
+  ungroup() %>%
+  group_by(st) %>%
+  summarize(N_IPD_pre=mean(N_IPD)) %>%
+  ungroup() %>%
+  tidyr::complete(st,  fill=list(N_IPD_pre=0))  #fills 0
+
+s2<- s1 %>%
+  group_by(st, year) %>%
+  summarize(N_IPD=sum(N_IPD)) %>% #sum across age group
+  ungroup() %>%
+  tidyr::complete(st, year, fill=list(N_IPD=0))%>%  #fills 0
+  left_join(s2_pre, by='st') %>%
+  mutate(N_IPD_pre = if_else(is.na(N_IPD_pre),0, N_IPD_pre) ,
+         logRR = log((N_IPD+1)/(N_IPD_pre+1) )) 
+
+max_RR <- s2 %>%
+  group_by(st) %>%
+  summarize(max_RR = max(logRR)) %>%
+  arrange((max_RR))
+
+s2$st <- factor(s2$st, levels = max_RR$st)
+
+df_wide <- s2 %>%
+  dplyr::select(year, st, logRR) %>%
+  tidyr::pivot_wider(names_from = year, values_from = logRR)
+
+
+df_vt <- df_wide %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='VT') %>%
+  dplyr::select(-pcv13st) 
+
+df_nvt <- df_wide %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='NVT') %>%
+  dplyr::select(-pcv13st) 
+
+rr_nvt <- s2 %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='NVT') %>%
+  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  labs(x = "Year", y =
+         "serotype", fill = "log RR") +
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+
+rr_vt <- s2 %>%
+  mutate(pcv13st = if_else(st %in% pcv13,'VT','NVT')) %>%
+  filter(pcv13st =='VT') %>%
+  ggplot( aes(x = factor(year), y = st, fill = logRR)) +
+  geom_tile() +
+  #     guides(fill="none")+
+  
+  scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0) +
+  labs(x = "Year", y =
+         "serotype", fill = "log RR") +
+  theme_minimal()+
+  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+```{r}
+#| panel: fill
+subplot(ggplotly(rr_vt), ggplotly(rr_nvt),  margin = 0.04)
+```
+
+This shows the decreases in serotypes targeted by PCV13 (left) and increases in the occurrence of non-vaccine serotypes (right) since 1998/1999
+
+#### Geographic variation in serotype frequency
+
+Some serotypes have a similar distribution across the US, while others (e.g., serotype 4) have distinct geographic patterns. serotype 4 has been largely confined to the western US in recent years and is largely found among people who are homeless. Data from 2019 IPD (Beall et al, JID 2022 10.1093/infdis/jiac058)
+
+```{r}
+#| panel: toolbar
+selectInput("select.st2",
+            "Select serotype:",
+            unique(ipd_serotype_state$sero),
+            selected='19F')
+```
+
+```{r}
+#| panel: fill
+plotlyOutput("stGeographyPlot")
+
+```
+
+#### Comparison of invasive pneumococcal disease and pneumonia
+
+```{r pneumococcus_data_3}
+ipd1 <- readRDS('./Data/Archive/pneumococcus/ABCs_st_1998_2021.rds') %>%
+  rename(agec = "Age.Group..years.",
+         year=Year,
+         st=IPD.Serotype,
+         N_IPD = Frequency.Count) %>%
+  mutate( st= if_else(st=='16','16F', st),
+          st = if_else(st %in% c('15B','15C'), '15BC',st),
+          if_else(st %in% c('6A','6C'), '6AC',st)
+  ) %>%
+  filter(year %in% c(2019,2020) & agec %in% c('Age 50-64','Age 65+')) %>%
+  group_by(st) %>%
+  summarize( N_IPD= sum(N_IPD))
+
+uad <- readxl::read_excel('./Data/Archive/pneumococcus/SSUAD/ramirez_ofid_2025_ofae727.xlsx') %>%
+  mutate(N_SSUAD= over65 + a50_64_with_indication + a50_64_no_indication ) %>%
+  full_join(ipd1, by='st') %>%
+  filter(!is.na(N_SSUAD) & !is.na(N_IPD))
+
+ggplot(uad, aes(x=N_IPD, y=N_SSUAD, label=st)) +
+  geom_point()+
+  geom_text( vjust = 1)+
+  theme_classic() +
+  ggtitle('IPD vs pneumonia 50+ years in US')
+```
+
+Most often, pneumococcal disease is diagnosed by isolating the bacteria from blood or cerebrospinal fluid. It is harder to determine what serotypes cause pneumonia. This study from Louisville, Kentucky found that the serotypes that are the most common causes of severe blood stream infections are also the most common causes of pneumonia. pneumonia [Ramirez et al OFID 2025](https://academic.oup.com/ofid/article/12/1/ofae727/7926903)
+:::
+:::
+
+------------------------------------------------------------------------
+
+## Childhood immunization rates
+
+Vaccination of children across the US, by state and vaccine. These data come from the [National Immunization Survey](https://data.cdc.gov/Child-Vaccinations/Vaccination-Coverage-among-Young-Children-0-35-Mon/fhky-rtsk/about_data) The size of the circle is proportional to the number of children participating in the survey. Caution should be used when interpreting these survey data.
+
+```{r vax_data}
+#| context: data
+#| include: false
+#| cache: true
+#| cache.extra: !expr file.info("data.csv")$mtime
+
+#pediatric vaccine yptake
+#https://data.cdc.gov/Child-Vaccinations/Vaccination-Coverage-among-Young-Children-0-35-Mon/fhky-rtsk/about_data
+
+# csv_to_parquet('./Data/vax/Vaccination_Coverage_among_Young_Children__0-35_Months__20250204.csv',path_to_parquet ='./Data/vax/peds_vax.parquet')
+#this breaks out the age data; also has info on income, race, urbanicity, etc
+vax_age <- open_dataset('./Data/Archive/vax/peds_vax.parquet') %>%
+  rename(birth_year = `Birth Year/Birth Cohort`, dim1=`Dimension Type`, age=Dimension,vax_uptake=`Estimate (%)`, samp_size_vax=`Sample Size`) %>%
+  collect() %>%
+  filter(birth_year==2021 & dim1=='Age') %>%
+  dplyr::select(Vaccine,Geography, Dose, dim1, vax_uptake,samp_size_vax, age) %>%
+  filter(age=='35 Months' & Geography %in% state.name &
+           (Vaccine %in% c('≥1 Dose MMR','≥1 Dose Varicella' ) | 
+              (Vaccine=='DTaP' & Dose =='≥4 Doses') | 
+              (Vaccine=='Hep A' & Dose =='≥2 Doses') | 
+              (Vaccine=='Hep B' & Dose =='≥3 Doses') | 
+              (Vaccine=='Hib' & Dose =='Full Series') | 
+              (Vaccine=='PCV' & Dose =='≥4 Doses') 
+           ) )
+
+vax_urban <- open_dataset('./Data/Archive/vax/peds_vax.parquet') %>%
+  rename(birth_year = `Birth Year/Birth Cohort`, dim1=`Dimension Type`, urban=Dimension,vax_uptake=`Estimate (%)`, samp_size_vax=`Sample Size`) %>%
+  collect() %>%
+  filter(birth_year=='2016-2019' & dim1=='Urbanicity') %>%
+  dplyr::select(Vaccine,Geography, Dose, dim1, vax_uptake,samp_size_vax, urban) %>%
+  filter( Geography %in% state.name &
+            (Vaccine %in% c('≥1 Dose MMR','≥1 Dose Varicella' ) | 
+               (Vaccine=='DTaP' & Dose =='≥4 Doses') | 
+               (Vaccine=='Hep A' & Dose =='≥2 Doses') | 
+               (Vaccine=='Hep B' & Dose =='≥3 Doses') | 
+               (Vaccine=='Hib' & Dose =='Full Series') | 
+               (Vaccine=='PCV' & Dose =='≥4 Doses') 
+            ) ) %>%
+  mutate(urban= factor(urban, levels= c("Living In a Non-MSA", "Living In a MSA Non-Principal City","Living In a MSA Principal City"),labels=c('Rural','Smaller City', 'Larger City') ))
+
+vax_insurance <- open_dataset('./Data/Archive/vax/peds_vax.parquet') %>%
+  rename(birth_year = `Birth Year/Birth Cohort`, dim1=`Dimension Type`, insurance=Dimension,vax_uptake=`Estimate (%)`, samp_size_vax=`Sample Size`) %>%
+  collect() %>%
+  filter(birth_year=='2016-2019' & dim1=='Insurance Coverage') %>%
+  dplyr::select(Vaccine,Geography, Dose, dim1, vax_uptake,samp_size_vax, insurance) %>%
+  filter( Geography %in% state.name &
+            (Vaccine %in% c('≥1 Dose MMR','≥1 Dose Varicella' ) | 
+               (Vaccine=='DTaP' & Dose =='≥4 Doses') | 
+               (Vaccine=='Hep A' & Dose =='≥2 Doses') | 
+               (Vaccine=='Hep B' & Dose =='≥3 Doses') | 
+               (Vaccine=='Hib' & Dose =='Full Series') | 
+               (Vaccine=='PCV' & Dose =='≥4 Doses') 
+            ) ) %>%
+  mutate(insurance= factor(insurance, levels= c("Uninsured", "Any Medicaid","Private Insurance Only","Other"),labels=c('Uninsured','Medicaid', 'Private','Other') ))
+
+
+
+```
+
+```{r vax_plots}
+#| context: server
+
+#vaccine urbanicity
+output$vax_urban_plot <- renderPlotly({
+  
+  plot_vax <- vax_urban %>% 
+    filter(Vaccine==input$select.vax2) %>% mutate(vax_order=as.numeric(as.factor(Vaccine)), Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
+    ggplot(aes(x = vax_uptake, y = urban, 
+               text=paste0(Geography, "<br>", 
+                           Vaccine_dose, "<br>",
+                           vax_uptake, "%" ))) +
+    geom_jitter(aes( color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
+    #scale_size(range = c(2, 5), name="Uptake (%)")+
+    scale_color_viridis_c(option = "viridis", direction=-1) +
+    labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
+    theme_minimal() + 
+    scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
+    theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, vjust = 0.5))
+  
+  ggplotly(plot_vax, tooltip='text') #display the plot
+  
+  
+})
+
+#vaccine, by insurance state
+output$vax_insurance_plot <- renderPlotly({
+  
+  plot_ins <- vax_insurance %>% 
+    filter(Vaccine==input$select.vax2) %>% mutate(vax_order=as.numeric(as.factor(Vaccine)),  
+                                                  Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
+    ggplot(aes(x = vax_uptake, y = insurance, 
+               text=paste0(Geography, "<br>", 
+                           Vaccine_dose, "<br>",
+                           vax_uptake, "%" ))) +
+    geom_jitter(aes( color = vax_uptake), height = 0.1, width = 0, alpha = 0.7) + 
+   # scale_size(range = c(2, 5), name="Uptake (%)")+
+    scale_color_viridis_c(option = "viridis", direction=-1) +
+    labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
+    theme_minimal() + 
+    scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
+    theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, 
+                                                                                                        vjust = 0.5))
+  
+  ggplotly(plot_ins, tooltip='text') #display the plot
+  
+})
+```
+
+::: panel-tabset
+### Uptake by state
+
+```{r, fig.width=5, fig.height=7}
+plot_vax <- vax_age %>% mutate(vax_order=as.numeric(as.factor(Vaccine)), Vaccine_dose=as.factor(paste(Vaccine,Dose)) ) %>% 
+  ggplot(aes(x = vax_uptake, y = Vaccine_dose, 
+             text=paste0(Geography, "<br>", 
+                         Vaccine_dose, "<br>",
+                         'Age: ',age, "<br>", 
+                         vax_uptake, "%" ))) +
+  geom_jitter(aes( color = vax_uptake), height = 0.25, width = 0, alpha = 0.7) + 
+  #scale_size(range = c(2, 5), name="Uptake (%)")+ 
+    scale_color_viridis_c(option = "viridis", direction=-1) +
+  labs(title = "Vaccination Rates by State, 35 months of age", x = "Vaccination Rate (%)", y = '') + 
+  theme_minimal() + 
+  scale_y_discrete(expand = expansion(mult = c(.1, .1))) + # Add more space between rows 
+  theme(legend.position = "none", plot.title = element_text(hjust = 0.5), axis.title.y = element_text(angle = 0, vjust = 0.5))
+
+ggplotly(plot_vax, tooltip='text')
+```
+
+### Uptake by urbanicity
+
+Variation in vaccine uptake based on how urban an area is.
+
+```{r}
+#| panel: toolbar
+
+selectInput("select.vax2", "Vaccine:", 
+            choices=unique(vax_urban$Vaccine), selected='PCV')
+```
+
+```{r}
+#| panel: fill
+#| layout-ncol: 1
+#| height: 1200px
+
+plotlyOutput("vax_urban_plot")
+
+```
+
+Variation in vaccine uptake based on how urban an area is. Uptake in non-urban, smaller urban, larger urban locations
+
+### Uptake based on insurance status
+
+```{r}
+#| panel: fill
+#| layout-ncol: 1
+#| height: 1200px
+
+plotlyOutput("vax_insurance_plot")
+
+```
+
+Variation in vaccine uptake rates based on insurance status
+:::
+
+------------------------------------------------------------------------
+
+## Youth Wellbeing
+
+------------------------------------------------------------------------
+
+```{r youth_self_harm_data}
+#| context: data
+#| include: false
+
+#data from WISQARS dashboard; manual download 2/27/2025
+#Self-Harm All Causes Nonfatal Emergency Department Visits and Rates per 100,000 ;Data Years: 2001 to 2022, United States, 0 to 4 through 15 to 19, Males, Females, Disposition: All Cases
+
+s1 <- read.csv('./Data/Archive/youth_wellbeing/WISQARS/youth_self_harm.csv') %>%
+  filter(Intent=='Self-Harm' & Age.Group %in% c('10 to 14','15 to 19')) %>%
+  mutate(Crude.Rate=as.numeric(Crude.Rate))
+
+
+
+```
+
+::: panel-tabset
+### Self-harm
+
+::: panel-tabset
+#### National (WISQARS)
+
+```{r}
+#| panel: fill
+
+p1 <- ggplot(s1, aes(x=Year, y=Crude.Rate, group=Sex, color=Sex, linetype=Sex)) +
+  geom_line()+
+  facet_wrap(~Age.Group) +
+  theme_classic() +
+  ylab('Events/100,000 people')+
+  ggtitle('Self harm among youths (CDC/WISQARS)')
+ggplotly(p1)
+```
+
+These data come from the [CDC WISQARS](https://wisqars.cdc.gov/) platform, which has data from the [National Electronic Injury Surveillance System-All Injury Program (NEISS-AIP)](https://wisqars.cdc.gov/about/nonfatal-injury-data/), a sample of emergency departments around the United States.
+
+#### State (Epic Cosmos)
+
+*Coming soon*
+
+```{r}
+#| panel: fill
+
+```
+:::
+
+### Road accidents
+
+*Coming soon!*
+
+::: panel-tabset
+#### Epic Cosmos
+
+*Coming soon!*
+
+```{r}
+#| panel: fill
+
+```
+:::
+
+### Overdose attempts
+
+*Coming soon!*
+
+::: panel-tabset
+#### Epic Cosmos
+
+*Coming soon!*
+
+```{r}
+#| panel: fill
+
+```
+:::
+
+### Obesity
+
+*Coming soon!*
+
+::: panel-tabset
+#### Epic Cosmos
+
+*Coming soon!*
+
+```{r}
+#| panel: fill
+
+```
+:::
+:::
+
+## Opioids
+
+```{r opioid_data}
+#| context: data
+#| include: false
+
+
+## NOTE: (Feb 28, 2025) Do not filter out the numerical codings (7777, 8888, and
+##       9999) from all numerical columns prior to plotting. Instead, only
+##       filter the column being plotted.
+
+
+# Interactive
+df1 <- read_csv('./Data/Archive/opioids/Harmonized Opioid Overdose Datasets_01.23.2025.csv', show_col_types = FALSE) |>
+  clean_names() |> 
+  dplyr::filter(!(count %in% c(7777, 8888, 9999))) |> 
+  dplyr::filter(!(crude_rate %in% c(7777, 8888, 9999))) |> 
+  dplyr::filter(!(age_adjusted_rate %in% c(7777, 8888, 9999))) %>%
+  mutate(qtr=as.numeric((gsub("Q",'', quarter))), 
+         qtr =if_else(is.na(qtr),1,qtr),
+         qdate= year+ qtr/4 -1/4
+  )
+
+opioid_path <- "./Data/Archive/opioids/Harmonized Opioid Overdose Datasets_01.23.2025.csv"
+
+df_opioid <- read_csv(opioid_path) |>
+  clean_names() |> 
+  filter(!(count %in% c(7777, 8888, 9999))) |> 
+  filter(!(crude_rate %in% c(7777, 8888, 9999))) |> 
+  filter(!(age_adjusted_rate %in% c(7777, 8888, 9999))) |> 
+  # Filter out rows without Quarter
+  filter(!is.na(quarter)) |> 
+  # Create year_quarter column
+  mutate(year_quarter = paste(year, quarter))
+
+#time series dataset
+opioid_ts_ds  <- df_opioid %>%
+  filter(drug=='All Opioids' & 
+           characteristic=='Age' ) |> 
+  group_by(dataset, state, year_quarter, level) %>%
+  summarize(count=sum(count, na.rm = TRUE)) |>
+  ungroup() |> 
+  pivot_wider(names_from = level, values_from = count) |> 
+  mutate(Overall = `25-44 Years` + `45-64 Years` + `65+ Years` + `<24 Years`) |> 
+  pivot_longer(
+    cols = where(is.numeric),
+    names_to = "level",
+    values_to = "count"
+  ) |> 
+  mutate(level = factor(level),
+         level = fct_relevel(level, c("Overall", "65+ Years",
+                                      "45-64 Years", "25-44 Years",
+                                      "<24 Years"))) |> 
+  filter(count > 0) 
+
+
+# Static
+opioid_od <- read_csv(opioid_path) %>%
+  as.data.frame()
+
+
+# Waffle Plots
+subset <- read_csv("Data/Archive/opioids/Harmonized Opioid Overdose Datasets_01.23.2025.csv") |> 
+  # Filter the placeholder numerical values.
+  #filter(`Age Adjusted Rate` %!in% 7777 & `Age Adjusted Rate` %!in% 8888 & `Age Adjusted Rate` %!in% 9999) %>%
+  filter(Count %!in% 7777 & Count %!in% 8888 & Count %!in% 9999) %>%
+  
+  # Removing the extraneous Drug and Year classes that are not common to the
+  # SUDORS and CDC WONDER dataset.
+  filter(Drug %!in% c("Naloxone"), Year %in% c(2020, 2021, 2022)) %>%
+  
+  # Filter the metadata settings.
+  filter(State %in% "US", Quarter %in% NA, Setting %in% "All",
+         `Underlying Cause of Death` %in% "Unintentional",
+         Characteristic %in% "Not Stratified", Level %in% "N/A") %>%
+  
+  # Some random duplicates were detected. Not sure where these might have
+  # been introduced or if the dataset came this way. This script is meant to
+  # quickly deal with these.
+  group_by(Dataset, Year, Drug) %>%
+  mutate(Count = sum(Count)) %>%
+  ungroup() %>%
+  
+  select(-`Crude Rate`, -`Age Adjusted Rate`, -Population) %>%
+  distinct() %>%
+  
+  # Calculate the relative proportion of overdose events for a given Dataset
+  # and Year.
+  group_by(Dataset, Year) %>%
+  mutate(Percentage = floor(Count/sum(Count)*100)) %>%
+  ungroup() %>%
+  
+  # Waffle plots do not accept NA's or 0's. Remove them.
+  mutate_at(c("Percentage"), ~replace_na(., 0)) %>%
+  filter(!Percentage == 0) %>%
+  
+  # Organize the final table.
+  .[with(., order(Dataset, Year, Percentage)), ] %>% `rownames<-`(NULL) %>%
+  as.data.frame()
+
+
+coloring <- data.frame("Drug"  = sort(unique(subset$Drug)),
+                       "Color" = c('#a6cee3','#1f78b4','#b2df8a','#33a02c','#fb9a99', '#e31a1c', '#fdbf6f','#ff7f00','#cab2d6','#6a3d9a','#ffff99')[1:length(sort(unique(subset$Drug)))]
+                       #"Color" = c('#8dd3c7','#bebada','#fb8072','#80b1d3','#fdb462','#b3de69','#fccde5','#d9d9d9','#bc80bd','#ccebc5','#ffffb3')[1:length(sort(unique(subset$Drug)))]
+                       )
+
+
+waffle_2020 <- subset %>%
+  filter(Year %in% 2020)
+
+waffle_2021 <- subset %>%
+  filter(Year %in% 2021)
+
+waffle_2022 <- subset %>%
+  filter(Year %in% 2022)
+
+ # Generate the waffle plots.
+  w1 <- waffle_2020 %>%
+    ggplot(aes(fill = Drug, values = Percentage)) +
+    geom_waffle(n_rows = 5, size = 0.33, colour = "white") +
+    facet_wrap(~Dataset+Year) +
+    # Add the color scheme specific for the drugs present in the SUDORS subset.
+    scale_fill_manual(name = NULL, 
+                      labels = coloring[coloring$Drug %in% unique(waffle_2020$Drug), "Drug"],
+                      values = coloring[coloring$Drug %in% unique(waffle_2020$Drug), "Color"]) +
+    coord_equal() + theme_void(base_size = 16) + 
+    theme(legend.position = "none")
+  
+  
+  w2 <- waffle_2021 %>%
+    ggplot(aes(fill = Drug, values = Percentage)) +
+    geom_waffle(n_rows = 5, size = 0.33, colour = "white") +
+    facet_wrap(~Dataset+Year) +
+    # Add the color scheme specific for the drugs present in the CDC WONDER subset.
+    scale_fill_manual(name = NULL, 
+                      labels = coloring[coloring$Drug %in% unique(waffle_2021$Drug), "Drug"],
+                      values = coloring[coloring$Drug %in% unique(waffle_2021$Drug), "Color"]) +
+    coord_equal() + theme_void(base_size = 16) + 
+    theme(legend.position = "none")
+  
+  
+  w3 <- waffle_2022 %>%
+    ggplot(aes(fill = Drug, values = Percentage)) +
+    geom_waffle(n_rows = 5, size = 0.33, colour = "white") +
+    facet_wrap(~Dataset+Year) +
+    # Add the color scheme specific for the drugs present in the CDC WONDER subset.
+    scale_fill_manual(name = NULL, 
+                      labels = coloring[coloring$Drug %in% unique(waffle_2022$Drug), "Drug"],
+                      values = coloring[coloring$Drug %in% unique(waffle_2022$Drug), "Color"]) +
+    coord_equal() + theme_void(base_size = 16) + 
+    theme(legend.position = "bottom", legend.title = element_blank())
+  
+  
+    # -----------------------------
+  # US Map plot.
+  
+  # Code to find mathes between AHRQ and CDC WONDER
+  #opioid_od[opioid_od$Dataset %in% "AHRQ", "Setting"] %>% unique()
+  
+  # Generate a side-by-side set of plots showing "Drug = All Opioids" counts
+  # by state in 2022. Toggle the setting to show either inpatient or ER.
+  
+  
+  # Counts in AHRQ dataset.
+  ahrq_map_plot <- opioid_od %>%
+    # Filter the placeholder numerical values.
+    filter(Count %!in% 7777 & Count %!in% 8888 & Count %!in% 9999) %>%
+    
+    # Switch between the two settings, and change the subtitle name.
+    filter(Setting %in% "Medical Facility - Inpatient") %>%
+    #filter(Setting %in% "Medical Facility - Outpatient or ER") %>%
+    
+    # Filter the metadata settings.
+    filter(Dataset %in% "AHRQ", State %in% datasets::state.name, 
+           Year %in% 2022, Quarter %in% NA,
+           `Underlying Cause of Death` %in% "All", Drug %in% "All Opioids",
+           Characteristic %in% "Not Stratified", Level %in% "N/A") %>%
+    
+    # plot_usmap() requires specific nomenclature for the column with states.
+    rename(state = State) %>%
+    
+    # Plot settings and features.
+    plot_usmap(data = ., values = "Count", color = "#00356B",) + 
+    scale_fill_gradientn(
+      colors = yale_gradient,   # Use Yale branding colors in gradient
+      name = "Count (2022)", 
+      labels = scales::comma    # Format labels with commas
+    ) + 
+    labs(title = "Hospitalizations (AHRQ)") +
+    theme(legend.position = "",
+          plot.title = element_text(size = 14),  # Increase title size
+          axis.ticks = element_blank(),
+          axis.text = element_blank(),
+          legend.text = element_text(size = 12),               # Adjust legend text
+          legend.title = element_text(size = 14))
+  
+  # Add a custom tooltip with comma formatting
+  ahrq_map_plot <- ahrq_map_plot +
+    aes(text = paste0("State: ", state, "<br>",
+                      "Count: ", scales::comma(Count)))
+  
+
+  # Counts in CDC WONDER dataset.
+  wonder_map_plot <- opioid_od %>%
+    # Filter the placeholder numerical values.
+    filter(Count %!in% 7777 & Count %!in% 8888 & Count %!in% 9999) %>%
+    
+    # Switch between the two settings, and change the subtitle name.
+    filter(Setting %in% "Medical Facility - Inpatient") %>%
+    #filter(Setting %in% "Medical Facility - Outpatient or ER") %>%
+    
+    # Filter the metadata settings.
+    filter(Dataset %in% "CDC WONDER", State %in% datasets::state.name, 
+           Year %in% 2022, Quarter %in% NA,
+           `Underlying Cause of Death` %in% "All", Drug %in% "All Opioids",
+           Characteristic %in% "Not Stratified", Level %in% "N/A") %>%
+    
+    # plot_usmap() requires specific nomenclature for the column with states.
+    rename(state = State) %>%
+    
+    # Plot settings and features.
+    plot_usmap(data = ., values = "Count", color = "#00356B",) + 
+    scale_fill_gradientn(
+      colors = yale_gradient,   # Use Yale branding colors in gradient
+      name = "Count (2022)", 
+      labels = scales::comma    # Format labels with commas
+    ) + 
+    labs(title = "\ \ \ \ \ \ Deaths (CDC WONDER)") +
+    theme(legend.position = "right",
+          plot.title = element_text(size = 14),  # Increase title size
+          axis.ticks = element_blank(),
+          axis.text = element_blank(),
+          legend.text = element_text(size = 14),               # Adjust legend text
+          legend.title = element_text(size = 16))
+  
+  # Add a custom tooltip with comma formatting
+  wonder_map_plot <- wonder_map_plot +
+    aes(text = paste0("State: ", state, "<br>",
+                      "Count: ", scales::comma(Count)))
+  
+  
+```
+
+```{r opioid_plots}
+#| context: server
+
+
+output$distPlot1 <- renderPlotly({
+  
+  p1 <- df1 %>%
+    dplyr::filter(drug=='All Opioids' & characteristic=='Age' & dataset=='AHRQ' & state == input$state.select ) %>%
+    group_by(qdate, level) %>%
+    summarize(count=sum(count)) %>% #combine outpatient nad inpatient
+    ggplot(aes(x=qdate, y=count, group=level, color=level)) +
+    theme_minimal() +
+    geom_line()
+  ggplotly(p1)
+})
+
+output$distPlot2 <- renderPlotly({
+  
+  p1 <- df1 %>%
+    dplyr::filter(drug=='All Opioids' & characteristic=='Age' & dataset=='NCHS' & state == input$state.select ) %>%
+    group_by(qdate, level) %>%
+    summarize(count=sum(count)) %>% #combine outpatient nad inpatient
+    ggplot(aes(x=qdate, y=count, group=level, color=level)) +
+    theme_minimal() +
+    geom_line()
+  ggplotly(p1)
+})
+
+## Opioid
+df_time_series_interactive <- reactive({
+  df_opioid %>%
+    filter(drug=='All Opioids' & 
+             characteristic=='Age' &
+             state == input$state) |> 
+    group_by(dataset, state, year_quarter, level) %>%
+    summarize(count=sum(count, na.rm = TRUE)) |>
+    ungroup() |> 
+    pivot_wider(names_from = level, values_from = count) |> 
+    mutate(Overall = `25-44 Years` + `45-64 Years` + `65+ Years` + `<24 Years`) |> 
+    pivot_longer(
+      cols = where(is.numeric),
+      names_to = "level",
+      values_to = "count"
+    ) |> 
+    mutate(level = factor(level),
+           level = fct_relevel(level, c("Overall", "65+ Years",
+                                        "45-64 Years", "25-44 Years",
+                                        "<24 Years"))) |> 
+    filter(count > 0) 
+})
+
+output$opioid_time_series_interactive_1 <- renderPlotly({ 
+  # User must provide inputs
+  req(input$state)
+  # Dataset must have rows
+  req(nrow(df_time_series_interactive()) > 0)
+  
+  p1 <- df_time_series_interactive() %>%
+    mutate(dataset=if_else(dataset=='NCHS', 'Deaths (NCHS)',
+                   if_else(dataset=='AHRQ', 'Hospitalizations (AHRQ)',dataset         ))) %>%
+    ggplot(aes(x = year_quarter, y = count, 
+               group = level, color = level,
+               text = paste0("Quarter: ", year_quarter, "\n",
+                             "Count: ", scales::comma(count)))) +
+    geom_line() +
+    labs(x = NULL,
+         y = "Count",
+         color = "Age Category") +
+    scale_x_discrete(breaks = c("2016 Q1", "2017 Q1", "2018 Q1",
+                                "2019 Q1", "2020 Q1", "2021 Q1", 
+                                "2022 Q1")) +
+    scale_y_continuous(labels = scales::comma) +
+    scale_color_manual(values = yale_colors) + # Apply Yale branding colors
+    facet_wrap(~dataset, scales='free_y') +
+    theme_minimal(base_size = 15) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  ggplotly(p1, tooltip = c("text"))
+}) 
+
+
+
+output$opioid_time_series_interactive_2 <- renderPlotly({
+  
+  p <- df_opioid %>%
+      mutate(dataset=if_else(dataset=='CDC WONDER', 'Deaths (NCHS)',
+                   if_else(dataset=='AHRQ', 'Hospitalizations (AHRQ)',dataset         ))) %>%
+    filter(drug=='All Opioids' & 
+             characteristic=='Sex' &
+             state == "US") %>%
+    group_by(dataset, state, year_quarter, level) %>%
+    summarize(count=sum(count, na.rm = TRUE)) %>%
+    ungroup() %>%
+    filter(count > 0) %>%
+    ggplot(aes(x = year_quarter, y = count, 
+               group = level, color = level,
+               text = paste0("Quarter: ", year_quarter, "\n",
+                             "Count: ", scales::comma(count)))) +
+    geom_line() +
+    labs(x = NULL,
+         y = "Count",
+         color = NULL,
+         title = "National Opioid Overdose Count") +
+    scale_x_discrete(breaks = c("2016 Q1", "2017 Q1", "2018 Q1",
+                                "2019 Q1", "2020 Q1", "2021 Q1", 
+                                "2022 Q1")) +
+    scale_y_continuous(labels = scales::comma) +
+    scale_color_manual(values = yale_colors) + # Apply Yale branding colors
+    facet_wrap(~dataset, scales='free_y') +
+    theme_minimal(base_size = 13) +
+    ylim(0, NA) +
+    theme(axis.text.x = element_text(angle = 45,  hjust = 1))
+  
+  ggplotly(p, tooltip = "text")
+})
+
+output$opioid_bar_graph_2020 <- renderPlotly({
+  
+  p <- opioid_od %>%
+    # Filter the placeholder numerical values.
+    filter(`Age Adjusted Rate` %!in% 7777 & `Age Adjusted Rate` %!in% 8888 & `Age Adjusted Rate` %!in% 9999) %>%
+    
+    # Change the date named in the plot title.
+    filter(Year %in% 2020) %>%
+    
+    # Filter the metadata settings.
+    filter(State %in% "US", Quarter %in% NA, Setting %in% "All",
+           `Underlying Cause of Death` %in% "Unintentional",
+           Characteristic %in% "Not Stratified", Level %in% "N/A") %>%
+    mutate(Drug = if_else(Drug == "Mental and behavioural disorders due to use of opioids, acute intoxication",
+                          "Mental and behavioural disorders",
+                          Drug)) %>%
+    
+    # Plot settings and features.
+    ggplot(data = ., aes(x = Drug, y = `Age Adjusted Rate`,
+                         text = paste0("Drug: ", Drug, "<br>",
+                                       "Age Adjusted Rate: ", `Age Adjusted Rate`))) +
+    geom_bar(stat = "identity", position = "dodge", aes(fill = Dataset, color = Dataset)) +
+    labs(title = "National Opioid Overdose Rate\nby Types of Opioid and Polysubstance in 2020",
+         subtitle = "Underlying Cause of Death: Unintentional Setting: All.",
+         x = "", y = "Age-Adjusted Rate (per 100,000)") +
+    scale_color_manual(values = yale_colors) + # Apply Yale branding colors
+    scale_fill_manual(values = yale_colors) + # Apply Yale branding colors
+    theme_minimal(base_size = 13) + 
+    theme(axis.text.x = element_text(angle = 90,  hjust = 1))
+  
+  ggplotly(p, tooltip = "text")
+})
+
+output$opioid_bar_graph_2021 <- renderPlotly({
+  
+  
+  p <- opioid_od %>%
+    # Filter the placeholder numerical values.
+    filter(`Age Adjusted Rate` %!in% 7777 & `Age Adjusted Rate` %!in% 8888 & `Age Adjusted Rate` %!in% 9999) %>%
+    
+    # Change the date named in the plot title.
+    filter(Year %in% 2021) %>%
+    
+    # Filter the metadata settings.
+    filter(State %in% "US", Quarter %in% NA, Setting %in% "All",
+           `Underlying Cause of Death` %in% "Unintentional",
+           Characteristic %in% "Not Stratified", Level %in% "N/A") %>%
+    mutate(Drug = if_else(Drug == "Mental and behavioural disorders due to use of opioids, acute intoxication",
+                          "Mental and behavioural disorders",
+                          Drug)) %>%
+    
+    # Plot settings and features.
+    ggplot(data = ., aes(x = Drug, y = `Age Adjusted Rate`,
+                         text = paste0("Drug: ", Drug, "<br>",
+                                       "Age Adjusted Rate: ", `Age Adjusted Rate`))) +
+    geom_bar(stat = "identity", position = "dodge", aes(fill = Dataset, color = Dataset)) +
+    labs(title = "National Opioid Overdose Rate by\nTypes of Opioid and Polysubstance in 2021",
+         subtitle = "Underlying Cause of Death: Unintentional Setting: All.",
+         x = "", y = "Age-Adjusted Rate\n(per 100,000)") +
+    scale_color_manual(values = yale_colors) + # Apply Yale branding colors
+    scale_fill_manual(values = yale_colors) + # Apply Yale branding colors
+    theme_minimal(base_size = 13) +
+    theme(axis.text.x = element_text(angle = 90,  hjust = 1))
+  
+  ggplotly(p, tooltip = "text")
+})
+
+output$opioid_bar_graph_2022 <- renderPlotly({
+  
+  
+  p <- opioid_od %>%
+    # Filter the placeholder numerical values.
+    filter(`Age Adjusted Rate` %!in% 7777 & `Age Adjusted Rate` %!in% 8888 & `Age Adjusted Rate` %!in% 9999) %>%
+    
+    # Change the date named in the plot title.
+    filter(Year %in% 2022) %>%
+    
+    # Filter the metadata settings.
+    filter(State %in% "US", Quarter %in% NA, Setting %in% "All",
+           `Underlying Cause of Death` %in% "Unintentional",
+           Characteristic %in% "Not Stratified", Level %in% "N/A") %>%
+    mutate(Drug = if_else(Drug == "Mental and behavioural disorders due to use of opioids, acute intoxication",
+                          "Mental and behavioural disorders",
+                          Drug)) %>%
+    
+    # Plot settings and features.
+    ggplot(data = ., aes(x = Drug, y = `Age Adjusted Rate`,
+                         text = paste0("Drug: ", Drug, "<br>",
+                                       "Age Adjusted Rate: ", `Age Adjusted Rate`))) +
+    geom_bar(stat = "identity", position = "dodge", aes(fill = Dataset, color = Dataset)) +
+    labs(title = "National Opioid Overdose Rate\nby Types of Opioid and Polysubstance in 2022",
+         subtitle = "Underlying Cause of Death: Unintentional Setting: All.",
+         x = "", y = "Age-Adjusted Rate\n(per 100,000)") +
+    scale_color_manual(values = yale_colors) + # Apply Yale branding colors
+    scale_fill_manual(values = yale_colors) + # Apply Yale branding colors
+    theme_minimal(base_size = 13) + 
+    theme(axis.text.x = element_text(angle = 90,  hjust = 1))
+  
+  ggplotly(p, tooltip = "text")
+  
+})
+
+
+
+
+```
+
+::: panel-tabset
+### Trends in national healthcare incidents
+
+```{r}
+#| panel: fill
+plotlyOutput("opioid_time_series_interactive_2")
+
+```
+
+### Map of opioid overdoses
+
+AHRQ hospitalizations
+
+```{r}
+#| panel: fill
+  ggplotly(ahrq_map_plot, tooltip = "text")
+```
+
+CDC WONDER
+
+```{r}
+#| panel: fill
+  ggplotly(wonder_map_plot, tooltip = "text")
+
+```
+
+### Type of opioid
+
+```{r}
+#| panel: fill
+waffle::iron(w1, w2, w3)
+```
+:::
+
+------------------------------------------------------------------------
+
+## Documentation
+
+### Notes on data sources
+
+Coming soon!
+
+### Acknowledgements
+
+We thank all of the organizations and individuals who make their data available for health monitoring and research.
+
+Some data used in this platform come from Epic Cosmos, a dataset created in collaboration with a community of Epic health systems representing more than 295 million patient records from over 1633 hospitals and 37,900 clinics from all 50 states, D.C., Lebanon, and Saudi Arabia. Epic data were obtained using the SlicerDicer tool in [Epic Cosmos.](https://www.epicresearch.org/about-us) and are presented here for non-commercial purposes.
+
+Google Trends data, representing search volume by week and state or metropolitan area, are obtained from the [Google Trends API](https://developers.google.com/terms/) for non-commercial purposes.
+
+Contributors include:
+
+Data wrangling, code, visualization: Shelby Golden, Howard Baik,Micah Iserman, Maurice Dalton, Deus Thindwa, Stephanie Perniciaro, Dan Weinberger
+
+Project Leadership and Partners: Megan Ranney, Bhramar Mukherjee, Katelyn Jetelina, Ron Borzekowski, Anne Zink, and Dan Weinberger
+
+Feedback or suggestions? [Let us know!](https://docs.google.com/forms/d/e/1FAIpQLSchAasiq7ovCCNz9ussb7C2ntkZ-8Rjc7-tNSglkf5boS-A0w/viewform?usp=dialog)
+
+**Legal Disclaimer**
+
+These data and PopHIVE statistical outputs are provided "as is", without warranty of any kind, express or implied, including but not limited to the warranties of merchantability, fitness for a particular purpose, and noninfringement. In no event shall the authors, contributors, or copyright holders be liable for any claim, damages, or other liability, whether in an action of contract, tort, or otherwise, arising from, out of, or in connection with the data or the use or other dealings in the data.The PopHIVE statistical outputs are research tools intended for use in the fields of public health and medicine. They are not intended for clinical decision making, are not intended to be used in the diagnosis or treatment of patients and may not be useful or appropriate for any clinical purpose. Users of the PopHIVE statistical outputs should be aware of their responsibilities to ensure the ethical and appropriate use of this technology, including adherence to any applicable legal and regulatory requirements. The content and data provided with the statistical outputs do not replace the expertise of healthcare professionals. Healthcare professionals should use their professional judgment in evaluating the outputs of the PopHIVE statistical outputs.
