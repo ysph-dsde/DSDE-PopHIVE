@@ -622,13 +622,13 @@ write.csv(d1_all,'./Data/plot_files/rsv_flu_covid_county_filled_map_nssp.csv')
 
 ##Metro; Crosswalk the DMA to counties FIPS codes
 #https://www.kaggle.com/datasets/kapastor/google-trends-countydma-mapping?resource=download
-# cw1 <- read.csv('./Data/other_data/GoogleTrends_CountyDMA_Mapping.csv') %>%
-#   mutate(GOOGLE_DMA=toupper(GOOGLE_DMA))
-# 
-# #Metro region
-# #https://stackoverflow.com/questions/61213647/what-do-gtrendsr-statistical-areas-correlate-with
-# #Nielsen DMA map: http://bl.ocks.org/simzou/6459889
-# #read in 'countries' file from gtrendsR
+cw1 <- read.csv('./Data/other_data/GoogleTrends_CountyDMA_Mapping.csv') %>%
+  mutate(GOOGLE_DMA=toupper(GOOGLE_DMA))
+
+#Metro region
+#https://stackoverflow.com/questions/61213647/what-do-gtrendsr-statistical-areas-correlate-with
+#Nielsen DMA map: http://bl.ocks.org/simzou/6459889
+#read in 'countries' file from gtrendsR
 # countries <- read.csv('./Data/other_data/countries_gtrendsR.csv')
 # metros <- countries[countries$country_code == 'US', ]
 # 
@@ -640,7 +640,10 @@ write.csv(d1_all,'./Data/plot_files/rsv_flu_covid_county_filled_map_nssp.csv')
 # 
 # dma_link1 <- cbind.data.frame('DMA_name'=metros$name,'DMA'=metros$numeric.sub.area) %>%
 #   rename(DMA_ID=DMA) %>%
-#   full_join(cw1, by=c("DMA_name"="GOOGLE_DMA"))
+#   full_join(cw1, by=c("DMA_name"="GOOGLE_DMA")) %>%
+#   dplyr::select(STATE , COUNTY, STATEFP, CNTYFP, DMA_ID) %>%
+#   mutate(DMA_ID = as.numeric(DMA_ID)) %>%
+#   filter(!is.na(DMA_ID))
 # 
 # 
 # 
@@ -650,20 +653,38 @@ write.csv(d1_all,'./Data/plot_files/rsv_flu_covid_county_filled_map_nssp.csv')
 # download.file(url1, temp_file1, mode = "wb")
 # 
 # g1_metro <- read_parquet(temp_file1) %>%
-#   filter(!(location %in% g_states) ) %>%
+#   filter(!(location %in% g_states)) %>%
+#   group_by(date, location, term) %>%
+#   summarize(value=mean(value)) %>% #averages over duplicate pulls
+#   ungroup() %>%
 #   collect() %>%
-#   mutate(date2=as.Date(date, '%b %d %Y'),
+#   mutate(date2=as.Date(date),
 #          date = as.Date(ceiling_date(date2, 'week'))-1) %>%
-#   filter(date>='2021-03-01') %>%
+#   mutate(location = as.numeric(location)) %>%
+#   filter(!is.na(location)) %>%
 #   rename(search_volume=value) %>%
+#   filter(date == as.Date('2024-12-7')) %>%
 #   left_join(dma_link1, by=c('location'='DMA_ID')) %>% #many to many join by date and counties
 #    group_by(STATEFP,CNTYFP) %>%
 #    mutate(fips=paste0(STATEFP,sprintf("%03d", CNTYFP)),
-#           fips=as.numeric(fips),
+#           fips=as.numeric(fips)) %>%
+#   ungroup() %>%
+#          mutate( search_volume_scale = search_volume/max(search_volume,na.rm=T)*100) %>%
+#    ungroup() %>%
+#   dplyr::select(date, term, STATE, COUNTY, fips,search_volume_scale)
 # 
-#           search_volume_scale = search_volume/max(search_volume,na.rm=T)*100) %>%
-#    ungroup()
-
+# 
+# usmap::plot_usmap(data=g1_metro,regions='county', values='search_volume_scale',
+#                   color = NA,    # Faint border color
+#                   size = 0     )+      # Thin border lines)   +
+#   theme(panel.background = element_rect(color = "white", fill = "white")) +
+#   scale_fill_gradientn(
+#     scaletitle,
+#     colors = pal1,
+#     values = scales::rescale(c(0, 25,50, 75, 100)),
+#     limits = c(0, 100),
+#     na.value = "darkgray"
+#   )
 
 ################
 ##Pneumococcal disease 
