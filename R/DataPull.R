@@ -394,7 +394,7 @@ ww1_rsv_harmonized <- cdc_ww_rsv%>%
   rename(Outcome_value1=rsv_ww,
          geography=state) %>%
   mutate(outcome_type='WasteWater',
-         outcome_label1 = 'Waste Water',
+         outcome_label1 = 'Waste Water wval (RSV)',
          domain = 'Respiratory infections',
          date_resolution = 'week',
          update_frequency = 'weekly',
@@ -428,7 +428,7 @@ ww1_flu_harmonized <- cdc_ww_flu %>%
   rename(Outcome_value1=flu_ww,
          geography=state) %>%
   mutate(outcome_type='WasteWater',
-         outcome_label1 = 'Waste Water (flu)',
+         outcome_label1 = 'Waste Water wval (Influenza)',
          domain = 'Respiratory infections',
          date_resolution = 'week',
          update_frequency = 'weekly',
@@ -447,7 +447,7 @@ ww1_flu_harmonized <- cdc_ww_flu %>%
 url_ww_covid <- "https://www.cdc.gov/wcms/vizdata/NCEZID_DIDRI/SC2StateLevelDownloadCSV.csv"
 
 cdc_ww_covid <- runIfExpired(source='wastewater_covid',storeIn='Raw',  basepath='./Data/Archive',
-                             ~ read_csv(url_ww_flu),tolerance=(24*7)
+                             ~ read_csv(url_ww_covid),tolerance=(24*7)
 )
 
 
@@ -462,7 +462,7 @@ ww1_covid_harmonized <- cdc_ww_covid %>%
   rename(Outcome_value1=covid_ww,
          geography=state) %>%
   mutate(outcome_type='WasteWater',
-         outcome_label1 = 'Waste Water (covid)',
+         outcome_label1 = 'Waste Water wval (SARS-CoV-2)',
          domain = 'Respiratory infections',
          date_resolution = 'week',
          update_frequency = 'weekly',
@@ -476,6 +476,7 @@ ww1_covid_harmonized <- cdc_ww_covid %>%
          additional_strata_level = NA_character_,
          sex_strata = 'none',
          sex_level = NA_character_) 
+
 
 
 #######################################

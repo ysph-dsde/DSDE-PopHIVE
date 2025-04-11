@@ -11,7 +11,7 @@ format:
     theme: cosmo
 project:
   execute-dir: project
-css: /R/styles.css
+css: styles.css
 server: shiny
 ---
 
@@ -110,8 +110,6 @@ This platform is designed to give its users timely, clear, and useful insights i
 
 ::: panel-tabset
 ### Respiratory Syncytial Virus (RSV)
-
-*RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months. State-level data typically represent certain regions or subsets of the population and do not necessarily represent disease spread in the entire state*
 
 ```{r}
 #| context: data
@@ -257,7 +255,7 @@ output$epicMapRSV <- renderPlotly({
       filter(date == input$selected_date & age_level == '<1 Years' & outcome_name=='RSV') %>%
       mutate(state = state.abb[match(geography, state.name)] ,
              #Note, if >20%, cap at 20 for plotting!
-           Outcome_value2 = if_else(Outcome_value2>20,20, Outcome_value2) 
+           Outcome_value2 = if_else(Outcome_value2>10,10, Outcome_value2) 
            #Outcome_value2 = if_else(Outcome_value4<5, Outcome_value4*0.01 ,Outcome_value2) #deals with cell suppression
            ) %>%
    filter(!is.na(state)) %>%
@@ -270,8 +268,8 @@ date.print <- input$selected_date
 p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value2") +
 scale_fill_gradientn(
     colors = pal1,
-    values = scales::rescale(c(0, 5, 10, 15, 20)),
-    limits = c(0, 20),
+    values = scales::rescale(c(0, 2.5, 5, 7.5, 10)),
+    limits = c(0, 10),
     na.value = "#440154FF"
   ) +
   ggtitle(paste("RSV ED Visit Percentage <1 year olds on", date.print))
@@ -298,8 +296,9 @@ plotlyOutput("distPlotRSV_dwh")
 
 ```
 
-|                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               *RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months. State-level data typically represent certain regions or subsets of the population and do not necessarily represent disease spread in the entire state*
+                                                                                                                                                               |
+|------------------------------------------------------------------------|
 | Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). The Google Trends data are obtained from the Google Health Trends API (volume of searches for 'rsv', subtracting volume of searches for category "respiratory syncytial virus vaccine" (Knowledge graph: /g/11j30ybfx6) ). Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/dwh_combined_plot1_long.csv). |
 
 #### Trends in positive tests
@@ -447,7 +446,7 @@ output$distPlotflu_dwh <- renderPlotly({
   pal1 <- pal1[-6]
   
   flu_ts_comp <- flu_all_indicators_state %>%
-    filter(geography==input$state.select2 ) %>%
+    filter(geography==input$state.select2.flu ) %>%
     mutate(ds_label = if_else(outcome_label1=='Google Searches 1', 'Google 1',
                               if_else(outcome_label1=='Google Searches 2', 'Google 2',
                                       if_else(outcome_label1=='Pct of ED visits', 'ED visits (CDC/NSSP)',           
@@ -483,7 +482,7 @@ output$distPlotflu_epic_ED_age <- renderPlotly({
   
   if(input$scale.flu==F){
     flu_epic_ts_comp <- epic_ed_combo %>%
-      filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='FLU' & age_level !='Total') %>%
+      filter(geography==input$state.select3.flu & date >=as.Date('2023-07-01') & outcome_name=='FLU' & age_level !='Total') %>%
       ggplot()+
       geom_line(aes(x=date, y=Outcome_value2, group_by=age_level, color=age_level)) +
       theme_minimal()+
@@ -496,7 +495,7 @@ output$distPlotflu_epic_ED_age <- renderPlotly({
     
   }else{
     flu_epic_ts_comp <- epic_ed_combo %>%
-      filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='FLU' & age_level !='Total') %>%
+      filter(geography==input$state.select3.flu & date >=as.Date('2023-07-01') & outcome_name=='FLU' & age_level !='Total') %>%
       
       ggplot()+
       geom_line(aes(x=date, y=Outcome_value3, group_by=age_level, color=age_level)) +
@@ -515,7 +514,7 @@ output$distPlotflu_epic_ED_age <- renderPlotly({
 output$epicMapflu <- renderPlotly({
   
   map_data <- epic_ed_combo %>%
-    filter(date == input$selected_date & age_level == '<1 Years' & outcome_name=='FLU') %>%
+    filter(date == input$selected_date.flu & age_level == 'Total' & outcome_name=='FLU') %>%
     mutate(state = state.abb[match(geography, state.name)] ,
            #Note, if >20%, cap at 20 for plotting!
            Outcome_value2 = if_else(Outcome_value2>20,20, Outcome_value2) 
@@ -526,7 +525,7 @@ output$epicMapflu <- renderPlotly({
   
   max.val <- max(epic_ed_combo$Outcome_value2, na.rm=T)
   pal1 <- viridis_pal()(4)
-  date.print <- input$selected_date
+  date.print <- input$selected_date.flu
   
   p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value2") +
     scale_fill_gradientn(
@@ -535,7 +534,7 @@ output$epicMapflu <- renderPlotly({
       limits = c(0, 20),
       na.value = "#440154FF"
     ) +
-    ggtitle(paste("Influenza ED Visit Percentage <1 year olds on", date.print))
+    ggtitle(paste("Influenza ED Visit Percentage in all ages on", date.print))
   
   ggplotly(p1)
 })
@@ -548,7 +547,7 @@ output$epicMapflu <- renderPlotly({
 ```{r}
 #| panel: toolbar
 
-selectInput("state.select2", "State:", 
+selectInput("state.select2.flu", "State:", 
             choices=state.name, selected='New York')
 ```
 
@@ -560,7 +559,7 @@ plotlyOutput("distPlotflu_dwh")
 ```
 
 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|------------------------------------------------------------------------|
 | Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/dwh_combined_plot1_long.csv). |
 
 \#### Trends in positive tests
@@ -570,7 +569,7 @@ plotlyOutput("distPlotflu_dwh")
 ```{r}
 #| panel: toolbar
 
-selectInput("state.select3", "State:", 
+selectInput("state.select3.flu", "State:", 
             choices=state.name, selected='New York')
 
 checkboxInput("scale.flu", "Rescale?", 
@@ -592,7 +591,7 @@ Data are smoothed with a 3 week average for vizualization.
 ```{r}
 #| panel: toolbar
 
-sliderInput("selected_date", label=NULL, 
+sliderInput("selected_date.flu", label=NULL, 
             min = min(epic_ed_combo$date), 
             max = max(epic_ed_combo$date),
             value = as.Date('2024-10-19'),
@@ -667,7 +666,7 @@ output$distPlotcovid_dwh <- renderPlotly({
   pal1 <- pal1[-6]
   
   covid_ts_comp <- covid_all_indicators_state %>%
-    filter(geography==input$state.select2 ) %>%
+    filter(geography==input$state.select2.covid ) %>%
     mutate(ds_label = if_else(outcome_label1=='Google Searches 1', 'Google 1',
                               if_else(outcome_label1=='Google Searches 2', 'Google 2',
                                       if_else(outcome_label1=='Pct of ED visits', 'ED visits (CDC/NSSP)',           
@@ -703,7 +702,7 @@ output$distPlotcovid_epic_ED_age <- renderPlotly({
   
   if(input$scale.covid==F){
     covid_epic_ts_comp <- epic_ed_combo %>%
-      filter(geography==input$state.select3 & date >=as.Date('2023-07-01') & outcome_name=='COVID' & age_level !='Total') %>%
+      filter(geography==input$state.select3.covid & date >=as.Date('2023-07-01') & outcome_name=='COVID' & age_level !='Total') %>%
       ggplot()+
       geom_line(aes(x=date, y=Outcome_value2, group_by=age_level, color=age_level)) +
       theme_minimal()+
@@ -735,10 +734,10 @@ output$distPlotcovid_epic_ED_age <- renderPlotly({
 output$epicMapcovid <- renderPlotly({
   
   map_data <- epic_ed_combo %>%
-    filter(date == input$selected_date & age_level == '<1 Years' & outcome_name=='COVID') %>%
+    filter(date == input$selected_date.covid & age_level == 'Total' & outcome_name=='COVID') %>%
     mutate(state = state.abb[match(geography, state.name)] ,
-           #Note, if >20%, cap at 20 for plotting!
-           Outcome_value2 = if_else(Outcome_value2>20,20, Outcome_value2) 
+           #Note, if >10%, cap at 10 for plotting!
+           Outcome_value2 = if_else(Outcome_value2>10,10, Outcome_value2) 
            #Outcome_value2 = if_else(Outcome_value4<5, Outcome_value4*0.01 ,Outcome_value2) #deals with cell suppression
     ) %>%
     filter(!is.na(state)) %>%
@@ -746,16 +745,16 @@ output$epicMapcovid <- renderPlotly({
   
   max.val <- max(epic_ed_combo$Outcome_value2, na.rm=T)
   pal1 <- viridis_pal()(4)
-  date.print <- input$selected_date
+  date.print <- input$selected_date.covid
   
   p1 <- usmap::plot_usmap(regions = "state", data = map_data, values = "Outcome_value2") +
     scale_fill_gradientn(
       colors = pal1,
-      values = scales::rescale(c(0, 5, 10, 15, 20)),
-      limits = c(0, 20),
+      values = scales::rescale(c(0, 2.5, 5, 7.5, 10)),
+      limits = c(0, 10),
       na.value = "#440154FF"
     ) +
-    ggtitle(paste("COVID-19 ED Visit Percentage <1 year olds on", date.print))
+    ggtitle(paste("COVID-19 ED Visit Percentage all ages", date.print))
   
   ggplotly(p1)
 })
@@ -768,7 +767,7 @@ output$epicMapcovid <- renderPlotly({
 ```{r}
 #| panel: toolbar
 
-selectInput("state.select2", "State:", 
+selectInput("state.select2.covid", "State:", 
             choices=state.name, selected='New York')
 ```
 
@@ -780,7 +779,7 @@ plotlyOutput("distPlotcovid_dwh")
 ```
 
 |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+|------------------------------------------------------------------------|
 | Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/dwh_combined_plot1_long.csv). |
 
 \#### Trends in positive tests
@@ -790,7 +789,7 @@ plotlyOutput("distPlotcovid_dwh")
 ```{r}
 #| panel: toolbar
 
-selectInput("state.select3", "State:", 
+selectInput("state.select3.covid", "State:", 
             choices=state.name, selected='New York')
 
 checkboxInput("scale.covid", "Rescale?", 
@@ -812,7 +811,7 @@ Data are smoothed with a 3 week average for vizualization.
 ```{r}
 #| panel: toolbar
 
-sliderInput("selected_date", label=NULL, 
+sliderInput("selected_date.covid", label=NULL, 
             min = min(epic_ed_combo$date), 
             max = max(epic_ed_combo$date),
             value = as.Date('2024-10-19'),
