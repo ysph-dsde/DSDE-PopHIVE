@@ -296,10 +296,9 @@ plotlyOutput("distPlotRSV_dwh")
 
 ```
 
-|                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               *RSV is a virus that affects the lungs and can cause serious illness, especially in babies and older adults. Every year, RSV cases start rising in the southeastern U.S. in early fall, then spread to other parts of the country over the next few months. State-level data typically represent certain regions or subsets of the population and do not necessarily represent disease spread in the entire state*
-                                                                                                                                                               |
-|------------------------------------------------------------------------|
-| Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). The Google Trends data are obtained from the Google Health Trends API (volume of searches for 'rsv', subtracting volume of searches for category "respiratory syncytial virus vaccine" (Knowledge graph: /g/11j30ybfx6) ). Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/dwh_combined_plot1_long.csv). |
+Viral levels in the community can be measured in different ways, which is important because no measure is perfect. By triangulating data from sources like emergency department (ED) visits, hospitalizations, and wastewater surveillance, we can get a more complete picture of how and when a virus is spreading, which can help you make better-informed decisions. Epic data come from the [Epic Cosmos platform](https://www.epicresearch.org/about-us). The Google Trends data are obtained from the Google Health Trends API (volume of searches for 'rsv', subtracting volume of searches for category "respiratory syncytial virus vaccine" (Knowledge graph: /g/11j30ybfx6) ). Get the data [here](https://github.com/ysph-dsde/DSDE-PopHIVE/raw/refs/heads/main/Data/plot_files/dwh_combined_plot1_long.csv). 
+
+
 
 #### Trends in positive tests
 
@@ -381,6 +380,7 @@ dates <- seq.Date(from=as.Date('2022-10-01'), to=Sys.Date(),by='week')
 
 p1 <- rsv_flu_covid_county_filled_nssp %>%
   filter(week_end==max(week_end)) %>%
+  mutate(percent_visits_rsv = if_else(percent_visits_rsv>2,2,percent_visits_rsv)) %>%
          usmap::plot_usmap(regions='county', data=.,values='percent_visits_rsv',
                         color = NA,    # Faint border color
                         size = 0     )+      # Thin border lines)   +
@@ -388,11 +388,10 @@ p1 <- rsv_flu_covid_county_filled_nssp %>%
  scale_fill_gradientn(
    scaletitle,
     colors = pal1,
-    values = scales::rescale(c(0, 0.33, 0.66, 0.99, max(rsv_flu_covid_county_filled_nssp$percent_visits_rsv))),
-    limits = c(0, max(rsv_flu_covid_county_filled_nssp$percent_visits_rsv)),
+    values = scales::rescale(c(0, 0.33, 0.66, 0.99,2)),
+    limits = c(0, 2),
     na.value = "darkgray"
   )
-
 
 plotly::ggplotly(p1)%>%
   layout(title = list(text = paste0(paste0('RSV ED visits by jurisdiction ', max(rsv_flu_covid_county_filled_nssp$week_end)),
@@ -625,6 +624,7 @@ dates <- seq.Date(from=as.Date('2022-10-01'), to=Sys.Date(),by='week')
 
 p1 <- rsv_flu_covid_county_filled_nssp %>%
   filter(week_end==max(week_end)) %>%
+  mutate(percent_visits_flu = if_else(percent_visits_flu>3,3,percent_visits_flu)) %>%
   usmap::plot_usmap(regions='county', data=.,values='percent_visits_flu',
                     color = NA,    # Faint border color
                     size = 0     )+      # Thin border lines)   +
@@ -632,8 +632,8 @@ p1 <- rsv_flu_covid_county_filled_nssp %>%
   scale_fill_gradientn(
     scaletitle,
     colors = pal1,
-    values = scales::rescale(c(0, 0.33, 0.66, 0.99, max(rsv_flu_covid_county_filled_nssp$percent_visits_flu))),
-    limits = c(0, max(rsv_flu_covid_county_filled_nssp$percent_visits_flu)),
+    values = scales::rescale(c(0, 0.75, 1.5, 2.25,3)),
+    limits = c(0,3),
     na.value = "darkgray"
   )
 
@@ -845,6 +845,7 @@ dates <- seq.Date(from=as.Date('2022-10-01'), to=Sys.Date(),by='week')
 
 p1 <- rsv_flu_covid_county_filled_nssp %>%
   filter(week_end==max(week_end)) %>%
+  mutate(percent_visits_covid=if_else(percent_visits_covid>3,3,percent_visits_covid)) %>%
   usmap::plot_usmap(regions='county', data=.,values='percent_visits_covid',
                     color = NA,    # Faint border color
                     size = 0     )+      # Thin border lines)   +
@@ -852,8 +853,8 @@ p1 <- rsv_flu_covid_county_filled_nssp %>%
   scale_fill_gradientn(
     scaletitle,
     colors = pal1,
-    values = scales::rescale(c(0, 0.33, 0.66, 0.99, max(rsv_flu_covid_county_filled_nssp$percent_visits_covid))),
-    limits = c(0, max(rsv_flu_covid_county_filled_nssp$percent_visits_covid)),
+    values = scales::rescale(c(0, 0.75, 1.5, 2.25, 3)),
+    limits = c(0, 3),
     na.value = "darkgray"
   )
 

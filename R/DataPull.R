@@ -597,6 +597,7 @@ d1_all <- cdc_nssp_rsv_flu_covid_ed1 %>%
   left_join(d1_state_rsv_flu_covid, by=c('week_end', 'state')) %>%
   mutate(percent_visits_covid = if_else(is.na(percent_visits_covid),percent_visits_covid_state,percent_visits_covid),
          percent_visits_flu = if_else(is.na(percent_visits_influenza),percent_visits_flu_state,percent_visits_influenza ),
+         percent_visits_rsv = if_else(is.na(percent_visits_rsv),percent_visits_rsv_state,percent_visits_rsv ),
          #fix CT county coding
          fips = if_else(state=='Connecticut' & county=='Fairfield',9001 ,
                         if_else(state=='Connecticut' &  county=='Hartford', 9003,
@@ -607,7 +608,9 @@ d1_all <- cdc_nssp_rsv_flu_covid_ed1 %>%
                                                                 if_else(state=='Connecticut' & county=='Tolland',9013 ,
                                                                         if_else(state=='Connecticut' & county=='Windham', 9015, fips)))))))
          ) ) %>%
-  as.data.frame()
+  dplyr::select(state, county, fips, week_end,percent_visits_covid, percent_visits_flu, percent_visits_rsv) %>%
+  as.data.frame() 
+  
 
 write.csv(d1_all,'./Data/plot_files/rsv_flu_covid_county_filled_map_nssp.csv')
 
@@ -619,14 +622,14 @@ write.csv(d1_all,'./Data/plot_files/rsv_flu_covid_county_filled_map_nssp.csv')
 
 ##Metro; Crosswalk the DMA to counties FIPS codes
 #https://www.kaggle.com/datasets/kapastor/google-trends-countydma-mapping?resource=download
-# cw1 <- read.csv('./Data/GoogleTrends_CountyDMA_Mapping.csv') %>%
+# cw1 <- read.csv('./Data/other_data/GoogleTrends_CountyDMA_Mapping.csv') %>%
 #   mutate(GOOGLE_DMA=toupper(GOOGLE_DMA))
 # 
 # #Metro region
 # #https://stackoverflow.com/questions/61213647/what-do-gtrendsr-statistical-areas-correlate-with
 # #Nielsen DMA map: http://bl.ocks.org/simzou/6459889
-# data("countries")
-# 
+# #read in 'countries' file from gtrendsR
+# countries <- read.csv('./Data/other_data/countries_gtrendsR.csv')
 # metros <- countries[countries$country_code == 'US', ]
 # 
 # metros <-
@@ -639,10 +642,14 @@ write.csv(d1_all,'./Data/plot_files/rsv_flu_covid_county_filled_map_nssp.csv')
 #   rename(DMA_ID=DMA) %>%
 #   full_join(cw1, by=c("DMA_name"="GOOGLE_DMA"))
 # 
-
-
-##Google metro data
-# g1_metro <- read_parquet(temp_file) %>%
+# 
+# 
+# ##Google metro data
+# url1 <- "https://github.com/DISSC-yale/gtrends_collection/raw/refs/heads/main/data/term=rsv/part-0.parquet"
+# temp_file1 <- tempfile(fileext = ".parquet")
+# download.file(url1, temp_file1, mode = "wb")
+# 
+# g1_metro <- read_parquet(temp_file1) %>%
 #   filter(!(location %in% g_states) ) %>%
 #   collect() %>%
 #   mutate(date2=as.Date(date, '%b %d %Y'),
@@ -653,10 +660,14 @@ write.csv(d1_all,'./Data/plot_files/rsv_flu_covid_county_filled_map_nssp.csv')
 #    group_by(STATEFP,CNTYFP) %>%
 #    mutate(fips=paste0(STATEFP,sprintf("%03d", CNTYFP)),
 #           fips=as.numeric(fips),
-#           
+# 
 #           search_volume_scale = search_volume/max(search_volume,na.rm=T)*100) %>%
-#    ungroup() 
+#    ungroup()
 
+
+################
+##Pneumococcal disease 
+################
 #csv_to_parquet('https://data.cdc.gov/resource/qvzb-qs6p.csv',path_to_parquet ='./Data/ipd_cdc1998.parquet')
 
 ipd1 <- readRDS('./Data/Archive/pneumococcus/ABCs_st_1998_2023.rds') %>%
