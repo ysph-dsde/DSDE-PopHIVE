@@ -3,3 +3,10 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# Data file was split into separate parquet's.
+# The RData frame included a file path and 5 plots 
+# that were not saved separately, only the 
+# data frames.
+
+play2_data/opioid_data.cached.RData
